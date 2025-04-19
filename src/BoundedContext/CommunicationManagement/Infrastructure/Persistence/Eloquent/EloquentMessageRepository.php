@@ -95,6 +95,15 @@ final class EloquentMessageRepository implements MessageRepositoryInterface
         $model->save();
     }
 
+    public function findAll(): array
+    {
+        $models = MessageModel::all();
+
+        return $models->map(function ($model) {
+            return $this->mapModelToEntity($model);
+        })->toArray();
+    }
+
     private function mapModelToEntity(MessageModel $model): Message
     {
         return new Message(

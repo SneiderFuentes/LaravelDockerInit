@@ -16,8 +16,9 @@ WORKDIR /var/www
 COPY composer.json composer.lock ./
 
 # 4) Instalamos dependencias y Horizon *sin* ejecutar scripts de post‑install
-RUN composer require laravel/horizon --no-scripts \
-    && composer install --no-dev --no-scripts --optimize-autoloader
+RUN composer install --no-dev --no-scripts --optimize-autoloader
+
+
 
 # 5) Ahora sí copiamos TODO tu código, incluido artisan
 COPY . .
@@ -25,6 +26,10 @@ COPY . .
 # 6) Generamos el autoloader definitivo y ejecutamos los scripts
 RUN composer dump-autoload --optimize \
     && php artisan package:discover --ansi
+
+# Publica config de Horizon una sola vez
+RUN php artisan horizon:install --ansi
+
 
 # 7) Preparamos el entrypoint
 COPY docker/php/entrypoint.sh /usr/local/bin/entrypoint

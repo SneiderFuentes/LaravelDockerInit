@@ -7,6 +7,7 @@ use Core\BoundedContext\AppointmentManagement\Domain\Repositories\AppointmentRep
 use Core\BoundedContext\AppointmentManagement\Domain\ValueObjects\AppointmentId;
 use Core\BoundedContext\AppointmentManagement\Domain\ValueObjects\AppointmentStatus;
 use Core\BoundedContext\SubaccountManagement\Domain\Repositories\SubaccountRepositoryInterface;
+use Core\BoundedContext\CommunicationManagement\Domain\Repositories\MessageRepositoryInterface;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -14,6 +15,8 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Core\BoundedContext\CommunicationManagement\Domain\ValueObjects\MessageStatus;
+use Core\BoundedContext\CommunicationManagement\Domain\Entities\Message;
 
 class SyncAppointments implements ShouldQueue
 {
@@ -37,15 +40,27 @@ class SyncAppointments implements ShouldQueue
      *
      * @param AppointmentRepositoryInterface $appointmentRepository
      * @param SubaccountRepositoryInterface $subaccountRepository
+     * @param MessageRepositoryInterface $messageRepository
      * @return void
      */
     public function handle(
         AppointmentRepositoryInterface $appointmentRepository,
-        SubaccountRepositoryInterface $subaccountRepository
+        SubaccountRepositoryInterface $subaccountRepository,
+        MessageRepositoryInterface $messageRepository
     ): void {
         Log::info('Starting appointment synchronization', [
             'subaccount_key' => $this->subaccountKey ?: 'all'
         ]);
+
+        // Obtener mensajes recibidos
+        $messages = $messageRepository->findAll();
+        $responseMap = [];
+        foreach ($messages as $message) {
+            if ($message->getType()->isWhatsapp() && $message->getStatus()->isRead()) {
+                $response = $this->interpretUserResponse($message->getContent());
+                $responseMap[$message->getAppointmentId()] = $response;
+            }
+        }
 
         // Get subaccounts to sync
         $subaccounts = $this->getSubaccountsToSync($subaccountRepository);
@@ -67,7 +82,7 @@ class SyncAppointments implements ShouldQueue
                 $appointments = $this->fetchAppointmentsFromExternalSystem($apiEndpoint, $apiKey);
 
                 // Sync with our database
-                $this->syncAppointments($appointments, $appointmentRepository);
+                $this->syncAppointments($appointments, $appointmentRepository, $responseMap);
 
                 Log::info('Completed appointment sync for subaccount', [
                     'subaccount_key' => $subaccount->key(),
@@ -117,7 +132,7 @@ class SyncAppointments implements ShouldQueue
     /**
      * Sync appointments with our database
      */
-    private function syncAppointments(array $externalAppointments, AppointmentRepositoryInterface $repository): void
+    private function syncAppointments(array $externalAppointments, AppointmentRepositoryInterface $repository, array $responseMap): void
     {
         foreach ($externalAppointments as $externalAppointment) {
             try {
@@ -127,37 +142,16 @@ class SyncAppointments implements ShouldQueue
                 // Buscar cita por ID y centerKey
                 $appointment = $repository->findById($externalAppointment['id'], $centerKey);
 
-                // If appointment doesn't exist, create it
-                if (!$appointment) {
-                    $appointment = Appointment::create(
-                        $externalAppointment['id'],
-                        $centerKey,
-                        $externalAppointment['patient_id'] ?? 'unknown',
-                        $externalAppointment['patient_name'],
-                        $externalAppointment['patient_phone'],
-                        new \DateTime($externalAppointment['scheduled_at']),
-                        $this->mapStatus($externalAppointment['status']),
-                        $externalAppointment['notes'] ?? null
-                    );
-                } else {
-                    // If it exists, update status if needed
-                    $newStatus = $this->mapStatus($externalAppointment['status']);
-                    if ($appointment->status() != $newStatus) {
-                        // Usar método adecuado según el estado
-                        switch ($newStatus) {
-                            case AppointmentStatus::Confirmed:
-                                $appointment = $appointment->confirm();
-                                break;
-                            case AppointmentStatus::Cancelled:
-                                $appointment = $appointment->cancel();
-                                break;
-                            case AppointmentStatus::Completed:
-                                $appointment = $appointment->complete();
-                                break;
-                            default:
-                                // Estado no manejado, podría requerir lógica adicional
-                                break;
-                        }
+                // Actualizar estado de la cita basado en la respuesta del usuario
+                $userResponse = $responseMap[$externalAppointment['id']] ?? null;
+                if ($userResponse) {
+                    switch ($userResponse) {
+                        case 'confirm':
+                            $appointment = $appointment->confirm();
+                            break;
+                        case 'cancel':
+                            $appointment = $appointment->cancel();
+                            break;
                     }
                 }
 
@@ -169,6 +163,21 @@ class SyncAppointments implements ShouldQueue
                 ]);
             }
         }
+    }
+
+    private function interpretUserResponse(string $content): ?string
+    {
+        $content = strtolower(trim($content));
+
+        if (strpos($content, 'confirmar') !== false || strpos($content, 'sí') !== false) {
+            return 'confirm';
+        }
+
+        if (strpos($content, 'cancelar') !== false || strpos($content, 'no') !== false) {
+            return 'cancel';
+        }
+
+        return null;
     }
 
     /**

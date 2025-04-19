@@ -28,8 +28,11 @@ services:
             MYSQL_DATABASE: appointments
             MYSQL_USER: appuser
             MYSQL_PASSWORD: apppass
+        ports:
+            - "3307:3306"
         volumes:
             - dbdata:/var/lib/mysql
+            - ./docker/mysql/init:/docker-entrypoint-initdb.d
         networks:
             - appnet
 

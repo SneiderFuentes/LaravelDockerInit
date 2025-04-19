@@ -145,6 +145,28 @@ class GenericDbAppointmentRepository implements AppointmentRepositoryInterface
             ->count();
     }
 
+    public function findScheduledAppointments(): array
+    {
+        $records = $this->connection->table($this->table)
+            ->where('status', 'scheduled')
+            ->get();
+
+        return $records->map(function ($record) {
+            return $this->mapToEntity($record);
+        })->toArray();
+    }
+
+    public function findUnconfirmedAppointments(): array
+    {
+        $records = $this->connection->table($this->table)
+            ->where('status', 'unconfirmed')
+            ->get();
+
+        return $records->map(function ($record) {
+            return $this->mapToEntity($record);
+        })->toArray();
+    }
+
     private function mapToEntity($record): Appointment
     {
         return Appointment::create(

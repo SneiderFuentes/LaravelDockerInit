@@ -164,6 +164,36 @@ final class GenericDbAppointmentRepository implements AppointmentRepositoryInter
             ->count();
     }
 
+    public function findScheduledAppointments(): array
+    {
+        $config = $this->getConfig('default');
+        $connection = DB::connection($config->connection());
+
+        $mapping = $config->mapping('appointments');
+        $appointmentTable = $config->tableName('appointments');
+
+        $records = $connection->table($appointmentTable)
+            ->where('status', 'scheduled')
+            ->get();
+
+        return $records->map(fn($row) => $this->mapToDomain($row, 'default'))->toArray();
+    }
+
+    public function findUnconfirmedAppointments(): array
+    {
+        $config = $this->getConfig('default');
+        $connection = DB::connection($config->connection());
+
+        $mapping = $config->mapping('appointments');
+        $appointmentTable = $config->tableName('appointments');
+
+        $records = $connection->table($appointmentTable)
+            ->where('status', 'unconfirmed')
+            ->get();
+
+        return $records->map(fn($row) => $this->mapToDomain($row, 'default'))->toArray();
+    }
+
     private function getConfig(string $centerKey): SubaccountConfig
     {
         if (!isset($this->configCache[$centerKey])) {

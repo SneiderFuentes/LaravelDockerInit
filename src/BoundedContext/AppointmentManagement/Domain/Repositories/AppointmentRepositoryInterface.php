@@ -46,4 +46,18 @@ interface AppointmentRepositoryInterface
      * Count appointments by status
      */
     public function countByStatus(string $centerKey, AppointmentStatus $status): int;
+
+    /**
+     * Find scheduled appointments that need reminders
+     *
+     * @return array
+     */
+    public function findScheduledAppointments(): array;
+
+    /**
+     * Find unconfirmed appointments that need calls
+     *
+     * @return array
+     */
+    public function findUnconfirmedAppointments(): array;
 }

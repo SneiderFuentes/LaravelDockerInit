@@ -17,4 +17,11 @@ interface MessageRepositoryInterface
     public function findByPatientId(string $patientId): array;
 
     public function update(Message $message): void;
+
+    /**
+     * Retrieve all messages
+     *
+     * @return Message[]
+     */
+    public function findAll(): array;
 }
