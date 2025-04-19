@@ -1,0 +1,74 @@
+# docker-compose.yml
+services:
+
+    app: &app-base
+        build:
+            context: .
+            dockerfile: docker/php/Dockerfile
+        image: appointments_app
+        container_name: appointments_app
+        working_dir: /var/www
+        # inyectamos todo lo de .env en el contenedor
+        env_file:
+            - .env
+        # montamos tu código
+        volumes:
+            - ./:/var/www
+        networks:
+            - appnet
+        depends_on:
+            - db
+            - redis
+
+    db:
+        image: mysql:8.0
+        container_name: appointments_db
+        environment:
+            MYSQL_ROOT_PASSWORD: secret
+            MYSQL_DATABASE: appointments
+            MYSQL_USER: appuser
+            MYSQL_PASSWORD: apppass
+        volumes:
+            - dbdata:/var/lib/mysql
+        networks:
+            - appnet
+
+    redis:
+        image: redis:7-alpine
+        container_name: appointments_redis
+        networks:
+            - appnet
+
+    nginx:
+        image: nginx:stable-alpine
+        container_name: appointments_nginx
+        ports:
+            - "80:80"
+        volumes:
+            - ./:/var/www
+            - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+        depends_on:
+            - app
+        networks:
+            - appnet
+
+    horizon:
+        <<: *app-base
+        container_name: appointments_horizon
+        # inyectamos las mismas vars que en app
+        env_file:
+            - .env
+        # sobreescribimos solo el comando de arranque
+        command: [ "php", "artisan", "horizon" ]
+        depends_on:
+            - redis
+            - db
+        networks:
+            - appnet
+
+volumes:
+    dbdata:
+
+
+networks:
+    appnet:
