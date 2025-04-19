@@ -1,66 +1,134 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# My Appointments - Sistema de Recordatorios de Citas
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Sistema de gestión de recordatorios de citas médicas con arquitectura hexagonal y DDD, integrado con MessageBird para notificaciones por WhatsApp y llamadas de voz.
 
-## About Laravel
+## Arquitectura
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+El proyecto sigue una arquitectura hexagonal con Domain-Driven Design (DDD) organizada en Bounded Contexts independientes:
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+-   **SubaccountManagement**: Gestión de conexiones y configuraciones para diferentes centros médicos
+-   **AppointmentManagement**: Core del negocio para gestionar citas
+-   **CommunicationManagement**: Integración con MessageBird para WhatsApp y llamadas
+-   **FlowManagement**: Orquestación de flujos de comunicación
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Requisitos
 
-## Learning Laravel
+-   PHP 8.2 o superior
+-   Composer
+-   Docker y Docker Compose
+-   Cuenta en MessageBird (para features de comunicación)
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## Instalación
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+1. Clonar el repositorio:
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+    ```bash
+    git clone https://github.com/yourusername/my-appointments.git
+    cd my-appointments
+    ```
 
-## Laravel Sponsors
+2. Copiar el archivo .env.example a .env:
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+    ```bash
+    cp .env.example .env
+    ```
 
-### Premium Partners
+3. Configurar las variables de entorno en el archivo .env:
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
+    - Configuración de BD principal y de centros médicos
+    - Credenciales de MessageBird
+    - IDs de flujos configurados en MessageBird
 
-## Contributing
+4. Levantar los contenedores:
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+    ```bash
+    docker-compose up -d
+    ```
 
-## Code of Conduct
+5. Instalar dependencias:
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+    ```bash
+    docker-compose exec app composer install
+    ```
 
-## Security Vulnerabilities
+6. Generar clave de aplicación:
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+    ```bash
+    docker-compose exec app php artisan key:generate
+    ```
 
-## License
+7. Ejecutar migraciones:
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+    ```bash
+    docker-compose exec app php artisan migrate
+    ```
+
+8. Cargar datos iniciales:
+
+    ```bash
+    docker-compose exec app php artisan db:seed
+    docker-compose exec app php artisan subaccounts:seed
+    ```
+
+9. Migrar bases de datos de prueba de centros médicos:
+
+    ```bash
+    docker-compose exec app php artisan migrate --path=database/migrations/centers
+    ```
+
+10. Cargar datos de prueba en centros médicos:
+    ```bash
+    docker-compose exec app php artisan db:seed --class=CentersTestDataSeeder
+    ```
+
+## Estructura del Proyecto
+
+```
+src/
+  BoundedContext/
+    SubaccountManagement/          # Gestión de centros médicos
+    AppointmentManagement/         # Gestión de citas
+    CommunicationManagement/       # Integración con MessageBird
+    FlowManagement/                # Orquestación de flujos
+    Shared/                        # Componentes compartidos
+```
+
+## Flujo de Trabajo
+
+1. El sistema lee citas pendientes de cada centro médico
+2. Envía recordatorios por WhatsApp a los pacientes
+3. Los pacientes confirman o cancelan respondiendo al mensaje
+4. El sistema actualiza el estado de las citas en la BD del centro
+5. Para pacientes que no responden, se programan llamadas de voz automatizadas
+
+## Endpoints API
+
+### Gestión de Centros (SubaccountManagement)
+
+-   `GET /api/subaccounts` - Listar centros
+-   `GET /api/subaccounts/{key}` - Ver configuración de un centro
+
+### Gestión de Citas (AppointmentManagement)
+
+-   `GET /api/centers/{centerKey}/appointments/pending` - Listar citas pendientes
+-   `POST /api/centers/{centerKey}/appointments/{id}/confirm` - Confirmar cita
+-   `POST /api/centers/{centerKey}/appointments/{id}/cancel` - Cancelar cita
+
+## Comandos Útiles
+
+-   Ejecutar tests: `docker-compose exec app php artisan test`
+-   Procesar trabajos en cola: `docker-compose exec app php artisan queue:work`
+-   Ver logs de Horizon: `docker-compose exec app php artisan horizon:list`
+-   Ejecutar solo migraciones de un centro: `docker-compose exec app php artisan migrate --database=mysql_center_a`
+
+## Extender el Sistema
+
+Para agregar un nuevo centro médico:
+
+1. Añadir configuración en `config/subaccounts.php`
+2. Agregar conexión en `config/database.php`
+3. Ejecutar `php artisan subaccounts:seed`
+
+## Licencia
+
+Este proyecto está licenciado bajo [MIT License](LICENSE).

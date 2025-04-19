@@ -112,6 +112,47 @@ return [
             // 'trust_server_certificate' => env('DB_TRUST_SERVER_CERTIFICATE', 'false'),
         ],
 
+        // Conexiones para centros médicos
+        'mysql_center_a' => [
+            'driver' => 'mysql',
+            'url' => env('DB_URL_CENTER_A'),
+            'host' => env('DB_HOST_CENTER_A', '127.0.0.1'),
+            'port' => env('DB_PORT_CENTER_A', '3306'),
+            'database' => env('DB_DATABASE_CENTER_A', 'center_a'),
+            'username' => env('DB_USERNAME_CENTER_A', 'root'),
+            'password' => env('DB_PASSWORD_CENTER_A', ''),
+            'unix_socket' => env('DB_SOCKET_CENTER_A', ''),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'strict' => true,
+            'engine' => null,
+            'options' => extension_loaded('pdo_mysql') ? array_filter([
+                PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+            ]) : [],
+        ],
+
+        'mysql_center_b' => [
+            'driver' => 'mysql',
+            'url' => env('DB_URL_CENTER_B'),
+            'host' => env('DB_HOST_CENTER_B', '127.0.0.1'),
+            'port' => env('DB_PORT_CENTER_B', '3306'),
+            'database' => env('DB_DATABASE_CENTER_B', 'center_b'),
+            'username' => env('DB_USERNAME_CENTER_B', 'root'),
+            'password' => env('DB_PASSWORD_CENTER_B', ''),
+            'unix_socket' => env('DB_SOCKET_CENTER_B', ''),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'strict' => true,
+            'engine' => null,
+            'options' => extension_loaded('pdo_mysql') ? array_filter([
+                PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+            ]) : [],
+        ],
+
     ],
 
     /*
@@ -147,7 +188,7 @@ return [
 
         'options' => [
             'cluster' => env('REDIS_CLUSTER', 'redis'),
-            'prefix' => env('REDIS_PREFIX', Str::slug(env('APP_NAME', 'laravel'), '_').'_database_'),
+            'prefix' => env('REDIS_PREFIX', Str::slug(env('APP_NAME', 'laravel'), '_') . '_database_'),
         ],
 
         'default' => [
