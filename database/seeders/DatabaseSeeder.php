@@ -22,9 +22,9 @@ class DatabaseSeeder extends Seeder
         ]);
 
         // Seed de subaccounts
-        $this->call([
-            \Database\Seeders\CentersTestDataSeeder::class,
-        ]);
+        // $this->call([
+        //     \Database\Seeders\CentersTestDataSeeder::class,
+        // ]);
 
         // Comando personalizado para cargar configuración
         $this->command->info('Executing subaccounts:seed command...');

@@ -128,13 +128,15 @@ return [
     | Application Service Providers
     |--------------------------------------------------------------------------
     |
-    | The service providers listed here will be automatically loaded on the
-    | request to your application. Feel free to add your own services to
-    | this array to grant expanded functionality to your applications.
+    | NOTA IMPORTANTE: En Laravel 10+, los providers principales ahora se registran en
+    | bootstrap/providers.php. Esta sección se mantiene por compatibilidad pero
+    | ya no debería ser la fuente principal de registro de los providers.
     |
     */
 
     'providers' => [
+        // Los providers principales ahora están en bootstrap/providers.php
+
         /*
          * Laravel Framework Service Providers...
          */
@@ -166,18 +168,9 @@ return [
          */
 
         /*
-         * Application Service Providers...
+         * NOTA: Los Application Service Providers y Bounded Context Service Providers
+         * ahora se registran en bootstrap/providers.php
          */
-        App\Providers\AppServiceProvider::class,
-        // App\Providers\AuthServiceProvider::class,
-        // App\Providers\EventServiceProvider::class,
-        // App\Providers\RouteServiceProvider::class,
-
-        /*
-         * Bounded Context Service Providers...
-         */
-        Core\BoundedContext\SubaccountManagement\Infrastructure\Providers\SubaccountServiceProvider::class,
-        Core\BoundedContext\AppointmentManagement\Infrastructure\Providers\AppointmentServiceProvider::class,
     ],
 
 ];

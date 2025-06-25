@@ -8,11 +8,23 @@ use InvalidArgumentException;
 
 final class SubaccountConfig
 {
+    private string $key;
+    private string $name;
     private string $connection;
+    private array $connections;
     private array $tables;
+    private ?string $apiHeader;
+    private ?string $apiKey;
 
-    public function __construct(string $connection, array $tables)
-    {
+    public function __construct(
+        string $key,
+        string $name,
+        string $connection,
+        array $tables,
+        array $connections = [],
+        ?string $apiHeader = null,
+        ?string $apiKey = null
+    ) {
         if (empty($connection)) {
             throw new InvalidArgumentException('Connection cannot be empty');
         }
@@ -21,8 +33,23 @@ final class SubaccountConfig
             throw new InvalidArgumentException('Tables configuration cannot be empty');
         }
 
+        $this->key = $key;
+        $this->name = $name;
         $this->connection = $connection;
         $this->tables = $tables;
+        $this->connections = $connections;
+        $this->apiHeader = $apiHeader;
+        $this->apiKey = $apiKey;
+    }
+
+    public function key(): string
+    {
+        return $this->key;
+    }
+
+    public function name(): string
+    {
+        return $this->name;
     }
 
     public function connection(): string
@@ -30,27 +57,47 @@ final class SubaccountConfig
         return $this->connection;
     }
 
+    public function connections(): array
+    {
+        return $this->connections;
+    }
+
     public function tables(): array
     {
         return $this->tables;
     }
 
-    public function mapping(string $tableKey): array
+    public function tableName(string $type): string
     {
-        if (!isset($this->tables[$tableKey]) || !isset($this->tables[$tableKey]['mapping'])) {
-            throw new InvalidArgumentException("Mapping for table '{$tableKey}' not found");
+        if (!isset($this->tables[$type]) || !isset($this->tables[$type]['table'])) {
+            throw new InvalidArgumentException("Table '{$type}' not found");
         }
 
-        return $this->tables[$tableKey]['mapping'];
+        return $this->tables[$type]['table'];
     }
 
-    public function tableName(string $tableKey): string
+    public function tableConfig(string $type): array
     {
-        if (!isset($this->tables[$tableKey]) || !isset($this->tables[$tableKey]['table'])) {
-            throw new InvalidArgumentException("Table '{$tableKey}' not found");
+        return $this->tables[$type] ?? [];
+    }
+
+    public function mapping(string $type): array
+    {
+        if (!isset($this->tables[$type]) || !isset($this->tables[$type]['mapping'])) {
+            throw new InvalidArgumentException("Mapping for table '{$type}' not found");
         }
 
-        return $this->tables[$tableKey]['table'];
+        return $this->tables[$type]['mapping'];
+    }
+
+    public function apiHeader(): ?string
+    {
+        return $this->apiHeader;
+    }
+
+    public function apiKey(): ?string
+    {
+        return $this->apiKey;
     }
 
     public static function fromArray(array $config): self
@@ -59,6 +106,14 @@ final class SubaccountConfig
             throw new InvalidArgumentException('Invalid configuration format');
         }
 
-        return new self($config['connection'], $config['tables']);
+        return new self(
+            $config['key'],
+            $config['name'],
+            $config['connection'],
+            $config['tables'],
+            $config['connections'] ?? [],
+            $config['api_header'] ?? null,
+            $config['api_key'] ?? null
+        );
     }
 }

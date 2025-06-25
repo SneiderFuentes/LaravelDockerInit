@@ -35,4 +35,19 @@ return [
         ],
     ],
 
+    'bird' => [
+        'api_key' => env('BIRD_API_KEY', ''),
+        'api_url' => env('BIRD_API_URL', 'https://go.messagebird.com/1/messages'),
+    ],
+
+    'messagebird' => [
+        'api_key' => env('BIRD_API_KEY_WA'),
+        'webhooks' => [
+            'appointment_flow_webhook' => env('FLOW_APPOINMENT_WEBHOOK_URL'),
+            'appointment_flow_webhook_header' => env('FLOW_APPOINMENT_WEBHOOK_API_HEADER'),
+            'appointment_flow_webhook_secret' => env('FLOW_APPOINMENT_WEBHOOK_API_KEY'),
+        ],
+        'chat_key' => env('CHAT_KEY'),
+    ],
+
 ];

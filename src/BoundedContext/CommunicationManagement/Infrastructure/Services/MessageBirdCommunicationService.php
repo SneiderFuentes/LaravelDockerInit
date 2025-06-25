@@ -22,6 +22,8 @@ use MessageBird\Objects\Conversation\Message as ConversationMessage;
 use MessageBird\Objects\Conversation\HSM\Message as HsmMessage;
 use MessageBird\Objects\Conversation\HSM\Params as HsmParams;
 use MessageBird\Objects\Conversation\HSM\Language as HsmLanguage;
+use Core\BoundedContext\CommunicationManagement\Application\Services\SendWhatsappMessageService;
+use Core\BoundedContext\CommunicationManagement\Domain\Ports\MessageGatewayInterface;
 
 final class MessageBirdCommunicationService implements CommunicationService
 {
@@ -30,7 +32,8 @@ final class MessageBirdCommunicationService implements CommunicationService
     public function __construct(
         private readonly string $apiKey,
         private readonly MessageRepositoryInterface $messageRepository,
-        private readonly CallRepositoryInterface $callRepository
+        private readonly CallRepositoryInterface $callRepository,
+        private readonly MessageGatewayInterface $messageGateway
     ) {
         $this->messageBirdClient = new Client($this->apiKey);
     }
@@ -86,77 +89,22 @@ final class MessageBirdCommunicationService implements CommunicationService
         string $patientId,
         string $phoneNumber,
         string $templateName,
-        array $parameters
-    ): DomainMessage {
-        $template = config("messagebird.templates.{$templateName}");
-        if (! $template) {
-            throw new \InvalidArgumentException("Template {$templateName} not found");
-        }
-
-        $contentDescription = "Template: {$templateName}";
-        $message = new DomainMessage(
-            Str::uuid()->toString(),
-            $appointmentId,
-            $patientId,
-            $phoneNumber,
-            $contentDescription,
-            MessageType::whatsapp(),
-            MessageStatus::pending()
+        array $parameters,
+        ?string $subaccountKey = null
+    ): string {
+        $service = new SendWhatsappMessageService(
+            $this->messageGateway,
+            $this->messageRepository
         );
 
-        try {
-            // Build the HSM payload
-            $hsm = new HsmMessage();
-            $hsm->namespace    = $template['namespace'];
-            $hsm->templateName = $template['name'];
-
-            $language = new HsmLanguage();
-            $language->code   = $template['language'];
-            // Optionally set $language->policy if needed
-            $hsm->language    = $language;
-
-            $hsm->params = [];
-            foreach ($template['params'] as $paramKey) {
-                if (! array_key_exists($paramKey, $parameters)) {
-                    throw new \InvalidArgumentException("Missing param '{$paramKey}' for template '{$templateName}'");
-                }
-                $param = new HsmParams();
-                $param->default = $parameters[$paramKey];
-                $hsm->params[] = $param;
-            }
-
-            $conversationMessage = new ConversationMessage();
-            $conversationMessage->channelId = config('messagebird.whatsapp.channel_id');
-            $conversationMessage->to        = $phoneNumber;
-            $conversationMessage->content   = $hsm;
-
-            $result = $this->messageBirdClient
-                ->conversations
-                ->start($conversationMessage);
-
-            $message = $message->markAsSent($result->id, new DateTime());
-            $this->messageRepository->save($message);
-
-            Log::info("WhatsApp template sent", [
-                'template'       => $templateName,
-                'appointment_id' => $appointmentId,
-                'phone_number'   => $phoneNumber,
-            ]);
-
-            return $message;
-        } catch (Exception $e) {
-            $message = $message->markAsFailed();
-            $this->messageRepository->save($message);
-
-            Log::error("Error sending WhatsApp template: {$e->getMessage()}", [
-                'template'       => $templateName,
-                'appointment_id' => $appointmentId,
-                'phone_number'   => $phoneNumber,
-                'parameters'     => $parameters,
-            ]);
-
-            return $message;
-        }
+        return $service->sendTemplateMessage(
+            $phoneNumber,
+            $templateName,
+            $parameters,
+            $appointmentId,
+            $patientId,
+            $subaccountKey
+        );
     }
 
     public function sendSMS(

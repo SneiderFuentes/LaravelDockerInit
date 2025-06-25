@@ -48,55 +48,171 @@ class SyncAppointments implements ShouldQueue
         SubaccountRepositoryInterface $subaccountRepository,
         MessageRepositoryInterface $messageRepository
     ): void {
-        Log::info('Starting appointment synchronization', [
+        Log::info('Iniciando sincronización de citas basada en respuestas de mensajes', [
             'subaccount_key' => $this->subaccountKey ?: 'all'
         ]);
 
-        // Obtener mensajes recibidos
-        $messages = $messageRepository->findAll();
-        $responseMap = [];
+        // Obtener mensajes con respuestas confirmadas o canceladas
+        $messages = $messageRepository->findActionableResponses();
+        $counter = [
+            'processed' => 0,
+            'updated' => 0,
+            'not_found' => 0,
+            'errors' => 0
+        ];
+
+        Log::info('Encontrados ' . count($messages) . ' mensajes con respuestas procesables');
+
+        // Procesar los mensajes accionables
         foreach ($messages as $message) {
-            if ($message->getType()->isWhatsapp() && $message->getStatus()->isRead()) {
-                $response = $this->interpretUserResponse($message->getContent());
-                $responseMap[$message->getAppointmentId()] = $response;
+            // Si no está asociado a una cita, continuar
+            if (!$message->getAppointmentId()) {
+                continue;
             }
-        }
 
-        // Get subaccounts to sync
-        $subaccounts = $this->getSubaccountsToSync($subaccountRepository);
+            $counter['processed']++;
+            $response = $message->getMessageResponse();
+            $appointmentId = $message->getAppointmentId();
+            $subaccountKey = $message->getSubaccountKey();
 
-        foreach ($subaccounts as $subaccount) {
+            // Si no tenemos subaccount_key, no podemos actualizar la cita
+            if (!$subaccountKey) {
+                Log::warning('Mensaje sin subaccount_key. No se puede actualizar la cita', [
+                    'message_id' => $message->getId(),
+                    'appointment_id' => $appointmentId
+                ]);
+                continue;
+            }
+
+
+
+            $action = $this->determineResponseAction($response);
+            if (!$action) {
+                continue; // No hay acción reconocible en la respuesta
+            }
+
+            Log::info('Procesando respuesta de usuario', [
+                'message_id' => $message->getId(),
+                'appointment_id' => $appointmentId,
+                'subaccount_key' => $subaccountKey,
+                'response' => $response,
+                'action' => $action
+            ]);
+
             try {
-                $config = $subaccount->config();
-                $apiKey = $config->getSetting('api_key');
-                $apiEndpoint = $config->getSetting('api_endpoint');
+                // Buscar la cita directamente en el centro correcto
+                $appointment = $appointmentRepository->findById($appointmentId, $subaccountKey);
 
-                if (!$apiKey || !$apiEndpoint) {
-                    Log::warning('Subaccount missing API configuration', [
-                        'subaccount_key' => $subaccount->key()
+                if (!$appointment) {
+                    Log::warning('Cita no encontrada', [
+                        'appointment_id' => $appointmentId,
+                        'subaccount_key' => $subaccountKey
                     ]);
+                    $counter['not_found']++;
                     continue;
                 }
 
-                // Fetch appointments from external system
-                $appointments = $this->fetchAppointmentsFromExternalSystem($apiEndpoint, $apiKey);
+                // Actualizar la cita según la acción
+                $updatedAppointment = $this->updateAppointmentStatus($appointment, $action, $message);
 
-                // Sync with our database
-                $this->syncAppointments($appointments, $appointmentRepository, $responseMap);
+                // Guardar la cita actualizada
+                $appointmentRepository->save($updatedAppointment);
+                $counter['updated']++;
 
-                Log::info('Completed appointment sync for subaccount', [
-                    'subaccount_key' => $subaccount->key(),
-                    'appointment_count' => count($appointments)
+                Log::info('Cita actualizada correctamente', [
+                    'appointment_id' => $appointmentId,
+                    'subaccount_key' => $subaccountKey,
+                    'new_status' => $this->getStatusName($updatedAppointment)
                 ]);
             } catch (\Exception $e) {
-                Log::error('Error syncing appointments for subaccount', [
-                    'subaccount_key' => $subaccount->key(),
+                $counter['errors']++;
+                Log::error('Error al actualizar cita', [
+                    'appointment_id' => $appointmentId,
+                    'subaccount_key' => $subaccountKey,
                     'error' => $e->getMessage()
                 ]);
             }
         }
 
-        Log::info('Appointment synchronization completed');
+        Log::info('Sincronización de citas completada', $counter);
+    }
+
+    /**
+     * Obtiene el nombre del estado de la cita de manera segura
+     *
+     * @param Appointment $appointment
+     * @return string
+     */
+    private function getStatusName(Appointment $appointment): string
+    {
+        $status = $appointment->status();
+
+        // Para enums de PHP 8.1+
+        if ($status instanceof \BackedEnum) {
+            return $status->value;
+        }
+
+        // Para objetos con método label
+        if (method_exists($status, 'label')) {
+            return $status->label();
+        }
+
+        // Para objetos con método __toString
+        if (is_object($status) && method_exists($status, '__toString')) {
+            return (string)$status;
+        }
+
+        // Si ninguno de los métodos anteriores funciona, devolver un valor genérico
+        return is_object($status) ? get_class($status) : 'Estado desconocido';
+    }
+
+    /**
+     * Determina la acción a realizar basada en el contenido de la respuesta
+     *
+     * @param string $response
+     * @return string|null
+     */
+    private function determineResponseAction(string $response): ?string
+    {
+        $responseLower = strtolower(trim($response));
+
+        // Respuestas de confirmación
+        if (
+            $responseLower === 'confirmed' ||
+            in_array($responseLower, ['si', 'sí', 'confirmar', 'confirmo', 'ok', 'yes'])
+        ) {
+            return 'confirm';
+        }
+
+        // Respuestas de cancelación
+        if (
+            $responseLower === 'canceled' || $responseLower === 'cancelled' ||
+            in_array($responseLower, ['no', 'cancelar', 'cancelo', 'cancelado'])
+        ) {
+            return 'cancel';
+        }
+
+        return null;
+    }
+
+    /**
+     * Actualiza el estado de una cita según la acción
+     *
+     * @param Appointment $appointment
+     * @param string $action
+     * @return Appointment
+     */
+    private function updateAppointmentStatus(Appointment $appointment, string $action, Message $message): Appointment
+    {
+        switch ($action) {
+            case 'confirm':
+                $appointment->confirm($message->getId());
+                break;
+            case 'cancel':
+                $appointment->cancel('Cancelado por respuesta del paciente', $message->getId());
+                break;
+        }
+        return $appointment;
     }
 
     /**
@@ -110,90 +226,5 @@ class SyncAppointments implements ShouldQueue
         }
 
         return $repository->findAll();
-    }
-
-    /**
-     * Fetch appointments from external system
-     */
-    private function fetchAppointmentsFromExternalSystem(string $apiEndpoint, string $apiKey): array
-    {
-        $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . $apiKey,
-            'Accept' => 'application/json'
-        ])->get($apiEndpoint . '/appointments');
-
-        if ($response->failed()) {
-            throw new \RuntimeException('Failed to fetch appointments: ' . $response->body());
-        }
-
-        return $response->json('data', []);
-    }
-
-    /**
-     * Sync appointments with our database
-     */
-    private function syncAppointments(array $externalAppointments, AppointmentRepositoryInterface $repository, array $responseMap): void
-    {
-        foreach ($externalAppointments as $externalAppointment) {
-            try {
-                // Obtener el centerKey del subaccount actual o usar un valor por defecto
-                $centerKey = $externalAppointment['center_key'] ?? $this->subaccountKey ?? 'default';
-
-                // Buscar cita por ID y centerKey
-                $appointment = $repository->findById($externalAppointment['id'], $centerKey);
-
-                // Actualizar estado de la cita basado en la respuesta del usuario
-                $userResponse = $responseMap[$externalAppointment['id']] ?? null;
-                if ($userResponse) {
-                    switch ($userResponse) {
-                        case 'confirm':
-                            $appointment = $appointment->confirm();
-                            break;
-                        case 'cancel':
-                            $appointment = $appointment->cancel();
-                            break;
-                    }
-                }
-
-                $repository->save($appointment);
-            } catch (\Exception $e) {
-                Log::error('Error processing appointment during sync', [
-                    'appointment_id' => $externalAppointment['id'] ?? 'unknown',
-                    'error' => $e->getMessage()
-                ]);
-            }
-        }
-    }
-
-    private function interpretUserResponse(string $content): ?string
-    {
-        $content = strtolower(trim($content));
-
-        if (strpos($content, 'confirmar') !== false || strpos($content, 'sí') !== false) {
-            return 'confirm';
-        }
-
-        if (strpos($content, 'cancelar') !== false || strpos($content, 'no') !== false) {
-            return 'cancel';
-        }
-
-        return null;
-    }
-
-    /**
-     * Map external status to our domain status
-     */
-    private function mapStatus(string $externalStatus): AppointmentStatus
-    {
-        switch (strtolower($externalStatus)) {
-            case 'confirmed':
-                return AppointmentStatus::Confirmed;
-            case 'cancelled':
-                return AppointmentStatus::Cancelled;
-            case 'completed':
-                return AppointmentStatus::Completed;
-            default:
-                return AppointmentStatus::Pending;
-        }
     }
 }

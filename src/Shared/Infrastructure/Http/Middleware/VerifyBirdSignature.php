@@ -18,19 +18,19 @@ class VerifyBirdSignature
      */
     public function handle(Request $request, Closure $next)
     {
-        $signature = $request->header('X-Bird-Signature');
-        $timestamp = $request->header('X-Bird-Timestamp');
-        $payload = $request->getContent();
+        // $signature = $request->header('X-Bird-Signature');
+        // $timestamp = $request->header('X-Bird-Timestamp');
+        // $payload = $request->getContent();
 
-        if (!$this->isValidSignature($signature, $timestamp, $payload)) {
-            Log::warning('Invalid Bird webhook signature', [
-                'ip' => $request->ip(),
-                'signature' => $signature,
-                'timestamp' => $timestamp
-            ]);
+        // if (!$this->isValidSignature($signature, $timestamp, $payload)) {
+        //     Log::warning('Invalid Bird webhook signature', [
+        //         'ip' => $request->ip(),
+        //         'signature' => $signature,
+        //         'timestamp' => $timestamp
+        //     ]);
 
-            throw new AccessDeniedHttpException('Invalid signature');
-        }
+        //     throw new AccessDeniedHttpException('Invalid signature');
+        // }
 
         return $next($request);
     }

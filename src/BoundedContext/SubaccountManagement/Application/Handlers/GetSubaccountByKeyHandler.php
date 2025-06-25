@@ -18,7 +18,6 @@ final class GetSubaccountByKeyHandler
     public function handle(GetSubaccountByKeyQuery $query): SubaccountDto
     {
         $subaccount = $this->repository->findByKey($query->key());
-
         if ($subaccount === null) {
             throw SubaccountNotFoundException::withKey($query->key());
         }

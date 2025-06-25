@@ -82,9 +82,9 @@ return [
     */
 
     'waits' => [
-        'redis:default' => 60,
-        'redis:appointment-sync' => 120,
-        'redis:appointment-reminders' => 180,
+        'redis:ai-vision' => 180,       // 3 minutos
+        'redis:ai-logic' => 120,        // 2 minutos
+        'redis:notifications' => 60,    // 1 minuto
     ],
 
     /*
@@ -185,6 +185,7 @@ return [
             'queue' => ['default'],
             'balance' => 'auto',
             'maxProcesses' => 1,
+            'minProcesses' => 1,
             'tries' => 1,
             'nice' => 0,
         ],
@@ -192,42 +193,66 @@ return [
 
     'environments' => [
         'production' => [
-            'supervisor-1' => [
+            'ai-vision-supervisor' => [
                 'connection' => 'redis',
-                'queue' => ['default'],
-                'balance' => 'simple',
-                'processes' => 10,
-                'tries' => 3,
+                'queue' => ['ai-vision'],
+                'balance' => 'simple', // Procesos fijos para jobs largos y pesados
+                'processes' => 2,      // Empezar con 2, monitorear carga de la API
+                'tries' => 3,          // El Job define esto, pero lo ponemos por claridad
+                'timeout' => 240,      // 4 mins, > al timeout del job (180s)
+                'memory' => 256,       // Más memoria para el procesamiento de archivos
+                'nice' => 10,          // Menor prioridad para no afectar a la app principal
             ],
-            'appointment-supervisor' => [
+            'ai-logic-supervisor' => [
                 'connection' => 'redis',
-                'queue' => ['appointment-sync', 'appointment-reminders'],
+                'queue' => ['ai-logic'],
                 'balance' => 'auto',
-                'maxProcesses' => 5,
-                'memory' => 128,
+                'minProcesses' => 1,
+                'maxProcesses' => 4,   // Escalado moderado para llamadas a API
                 'tries' => 3,
-                'timeout' => 180,
-                'nice' => 0,
+                'timeout' => 180,      // 3 mins, > al timeout del job más largo (120s)
+                'memory' => 128,
+                'nice' => 5,
+            ],
+            'notifications-supervisor' => [
+                'connection' => 'redis',
+                'queue' => ['notifications'],
+                'balance' => 'auto',
+                'minProcesses' => 2,
+                'maxProcesses' => 10,  // Pueden correr muchos en paralelo
+                'tries' => 3,
+                'timeout' => 240,      // 4 mins, > al timeout del job más largo (180s)
+                'memory' => 128,
             ],
         ],
 
         'local' => [
-            'supervisor-1' => [
+            'ai-vision-supervisor' => [
                 'connection' => 'redis',
-                'queue' => ['default'],
+                'queue' => ['ai-vision'],
                 'balance' => 'simple',
-                'processes' => 3,
+                'processes' => 1,
                 'tries' => 3,
+                'timeout' => 240,
+                'memory' => 256,
             ],
-            'appointment-supervisor' => [
+            'ai-logic-supervisor' => [
                 'connection' => 'redis',
-                'queue' => ['appointment-sync', 'appointment-reminders'],
-                'balance' => 'auto',
-                'maxProcesses' => 3,
-                'memory' => 128,
+                'queue' => ['ai-logic'],
+                'balance' => 'simple',
+                'processes' => 1,
                 'tries' => 3,
                 'timeout' => 180,
-                'nice' => 0,
+                'memory' => 128,
+            ],
+            'notifications-supervisor' => [
+                'connection' => 'redis',
+                'queue' => ['notifications', 'default'], // Incluimos 'default' para otros jobs de desarrollo
+                'balance' => 'simple',
+                'processes' => 2,
+                'tries' => 3,
+                'timeout' => 240,
+                'memory' => 128,
             ],
         ],
     ],

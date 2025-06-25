@@ -15,24 +15,26 @@ final class SendWhatsAppTemplateCommandHandler implements CommandHandler
 
     public function __invoke(SendWhatsAppTemplateCommand $command): void
     {
-        $message = $this->communicationService->sendWhatsAppTemplate(
+        $messageId = $this->communicationService->sendWhatsAppTemplate(
             $command->appointmentId(),
             $command->patientId(),
             $command->phoneNumber(),
             $command->templateName(),
-            $command->parameters()
+            $command->parameters(),
+            $command->subaccountKey()
         );
 
         // Publicar evento de dominio
         $this->eventBus->publish(
             new \Core\BoundedContext\CommunicationManagement\Domain\Events\MessageSent(
-                $message->getId(),
-                $message->getAppointmentId(),
-                $message->getPatientId(),
-                $message->getPhoneNumber(),
-                $message->getType()->value(),
-                $message->getContent(),
-                $message->getMessageId() ?? ''
+                $messageId,
+                $command->appointmentId(),
+                $command->patientId(),
+                $command->phoneNumber(),
+                'whatsapp',
+                json_encode($command->parameters()),
+                $messageId,
+                $command->subaccountKey()
             )
         );
     }

@@ -5,11 +5,12 @@ namespace Core\BoundedContext\CommunicationManagement\Application\SendWhatsAppTe
 final class SendWhatsAppTemplateCommand
 {
     public function __construct(
-        private readonly string $appointmentId,
-        private readonly string $patientId,
-        private readonly string $phoneNumber,
-        private readonly string $templateName,
-        private readonly array $parameters
+        public readonly string $appointmentId,
+        public readonly string $patientId,
+        public readonly string $phoneNumber,
+        public readonly string $templateName,
+        public readonly array $parameters,
+        public readonly ?string $subaccountKey = null
     ) {}
 
     public function appointmentId(): string
@@ -35,5 +36,10 @@ final class SendWhatsAppTemplateCommand
     public function parameters(): array
     {
         return $this->parameters;
+    }
+
+    public function subaccountKey(): ?string
+    {
+        return $this->subaccountKey;
     }
 }

@@ -18,6 +18,7 @@ class Message
         private MessageStatus $status,
         private ?string $messageId = null,
         private ?string $messageResponse = null,
+        private ?string $subaccountKey = null,
         private ?DateTime $sentAt = null,
         private ?DateTime $deliveredAt = null,
         private ?DateTime $readAt = null,
@@ -71,6 +72,11 @@ class Message
     public function getMessageResponse(): ?string
     {
         return $this->messageResponse;
+    }
+
+    public function getSubaccountKey(): ?string
+    {
+        return $this->subaccountKey;
     }
 
     public function getSentAt(): ?DateTime

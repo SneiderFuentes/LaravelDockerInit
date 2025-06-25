@@ -19,6 +19,7 @@ return new class extends Migration
             $table->string('status'); // pending, sent, delivered, read, failed
             $table->string('message_id')->nullable();
             $table->text('message_response')->nullable();
+            $table->string('subaccount_key')->nullable(); // Clave del centro/subaccount
             $table->timestamp('sent_at')->nullable();
             $table->timestamp('delivered_at')->nullable();
             $table->timestamp('read_at')->nullable();
@@ -27,6 +28,7 @@ return new class extends Migration
             $table->index('appointment_id');
             $table->index('patient_id');
             $table->index('message_id');
+            $table->index('subaccount_key');
         });
 
         // Tabla de llamadas

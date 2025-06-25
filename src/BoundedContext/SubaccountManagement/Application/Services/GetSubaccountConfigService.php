@@ -21,7 +21,15 @@ final class GetSubaccountConfigService
             $query = new GetSubaccountByKeyQuery($centerKey);
             $dto = $this->handler->handle($query);
 
-            return SubaccountConfig::fromArray($dto->config());
+            return SubaccountConfig::fromArray([
+                'key' => $dto->key(),
+                'name' => $dto->name(),
+                'connection' => $dto->config()['connection'],
+                'tables' => $dto->config()['tables'],
+                'connections' => $dto->config()['connections'] ?? [],
+                'api_header' => $dto->config()['apiHeader'] ?? null,
+                'api_key' => $dto->config()['apiKey'] ?? null,
+            ]);
         } catch (SubaccountNotFoundException $e) {
             throw $e;
         } catch (\Throwable $e) {

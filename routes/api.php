@@ -25,23 +25,22 @@ Route::get('/health', function () {
     return response()->json([
         'status' => 'ok',
         'timestamp' => now()->toIso8601String(),
-        'version' => config('app.version', '1.0.0'),
     ]);
 });
 
 // Rutas para comunicación
-Route::prefix('communication')->group(function () {
-    // Mensajes
-    Route::post('/messages/whatsapp', [MessageController::class, 'sendWhatsapp']);
-    Route::post('/messages/webhook', [MessageController::class, 'webhook']);
+// Route::prefix('communication')->group(function () {
+//     // Mensajes
+//     Route::post('/messages/whatsapp', [MessageController::class, 'sendWhatsapp']);
+//     Route::post('/messages/webhook', [MessageController::class, 'webhook']);
 
-    // Llamadas
-    Route::post('/calls', [CallController::class, 'initiateCall']);
-    Route::post('/calls/webhook', [CallController::class, 'webhook']);
-});
+//     // Llamadas
+//     Route::post('/calls', [CallController::class, 'initiateCall']);
+//     Route::post('/calls/webhook', [CallController::class, 'webhook']);
+// });
 
 // Webhook de MessageBird (sin autenticación)
-Route::post('/bird/webhook', [MessageController::class, 'webhook']);
+//Route::post('/bird/webhook', [MessageController::class, 'webhook']);
 
 // Main API routes are registered from domain-specific route files in:
 // - src/BoundedContext/SubaccountManagement/Infrastructure/Http/routes.php

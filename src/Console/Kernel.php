@@ -9,6 +9,7 @@ use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 use Core\Jobs\SendWhatsappMessages;
 use Core\Jobs\CallUnconfirmedUsers;
 use Core\BoundedContext\SubaccountManagement\Infrastructure\Commands\SeedSubaccountsCommand;
+use Core\BoundedContext\CommunicationManagement\Infrastructure\Commands\DispatchJob;
 
 class Kernel extends ConsoleKernel
 {
@@ -19,6 +20,8 @@ class Kernel extends ConsoleKernel
      */
     protected $commands = [
         SeedSubaccountsCommand::class,
+        DispatchJob::class,
+        \Core\Console\HealthCheckCommand::class,
     ];
 
     /**
@@ -29,25 +32,6 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule)
     {
-        // Sync appointments every 30 minutes during business hours
-        $schedule->job(new SyncAppointments())
-            ->weekdays()
-            ->between('8:00', '20:00')
-            ->everyThirtyMinutes()
-            ->withoutOverlapping()
-            ->runInBackground();
-
-        // // Send appointment reminders daily at 10:00
-        // $schedule->job(new SendAppointmentReminders())
-        //     ->dailyAt('10:00')
-        //     ->withoutOverlapping()
-        //     ->runInBackground();
-
-        // Run queue worker for processing jobs
-        $schedule->command('queue:work --stop-when-empty --queue=default')
-            ->everyMinute()
-            ->withoutOverlapping()
-            ->runInBackground();
 
         // Prune horizon metrics
         $schedule->command('horizon:purge')

@@ -15,10 +15,11 @@ final class MessageSent extends DomainEvent
         private string $messageType,
         private string $content,
         private string $messageId,
+        private ?string $subaccountKey = null,
         private ?string $eventId = null,
         private ?string $occurredOn = null
     ) {
-        parent::__construct($id, $eventId, $occurredOn);
+        parent::__construct($eventId, $occurredOn);
     }
 
     public static function fromPrimitives(
@@ -35,6 +36,7 @@ final class MessageSent extends DomainEvent
             $body['message_type'],
             $body['content'],
             $body['message_id'],
+            $body['subaccount_key'] ?? null,
             $eventId,
             $occurredOn
         );
@@ -42,18 +44,20 @@ final class MessageSent extends DomainEvent
 
     public static function eventName(): string
     {
-        return 'communication.message.sent';
+        return 'message.sent';
     }
 
     public function toPrimitives(): array
     {
         return [
+            'id' => $this->id,
             'appointment_id' => $this->appointmentId,
             'patient_id' => $this->patientId,
             'phone_number' => $this->phoneNumber,
             'message_type' => $this->messageType,
             'content' => $this->content,
-            'message_id' => $this->messageId
+            'message_id' => $this->messageId,
+            'subaccount_key' => $this->subaccountKey
         ];
     }
 
@@ -85,5 +89,10 @@ final class MessageSent extends DomainEvent
     public function messageId(): string
     {
         return $this->messageId;
+    }
+
+    public function subaccountKey(): ?string
+    {
+        return $this->subaccountKey;
     }
 }

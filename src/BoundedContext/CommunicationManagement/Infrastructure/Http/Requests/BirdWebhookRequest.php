@@ -15,9 +15,15 @@ class BirdWebhookRequest extends FormRequest
     {
         return [
             'type' => 'required|string',
+            'message_id' => 'required|string',
+            'status' => 'nullable|string',
+            'timestamp' => 'nullable|string',
             'from' => 'required|string',
-            'message' => 'nullable|string',
-            'message_id' => 'nullable|string',
+            'message' => 'nullable|array',
+            'message.type' => 'nullable|string',
+            'message.content' => 'nullable|string',
+            'context' => 'nullable|array',
+            'context.message_id' => 'nullable|string',
         ];
     }
 }

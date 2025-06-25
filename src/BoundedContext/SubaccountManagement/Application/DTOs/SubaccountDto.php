@@ -27,7 +27,11 @@ final class SubaccountDto
             [
                 'connection' => $subaccount->config()->connection(),
                 'tables' => $subaccount->config()->tables(),
+                'connections' => $subaccount->config()->connections(),
+                'apiHeader' => $subaccount->config()->apiHeader(),
+                'apiKey' => $subaccount->config()->apiKey(),
             ],
+
             $subaccount->createdAt(),
             $subaccount->updatedAt()
         );

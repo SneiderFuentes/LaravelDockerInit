@@ -5,44 +5,53 @@ declare(strict_types=1);
 namespace Core\BoundedContext\AppointmentManagement\Application\Handlers;
 
 use Core\BoundedContext\AppointmentManagement\Application\Commands\ConfirmAppointmentCommand;
-use Core\BoundedContext\AppointmentManagement\Application\DTOs\AppointmentDto;
+use Core\BoundedContext\AppointmentManagement\Application\DTOs\AppointmentDTO;
 use Core\BoundedContext\AppointmentManagement\Domain\Events\AppointmentConfirmed;
 use Core\BoundedContext\AppointmentManagement\Domain\Exceptions\AppointmentNotFoundException;
 use Core\BoundedContext\AppointmentManagement\Domain\Repositories\AppointmentRepositoryInterface;
+use Core\BoundedContext\AppointmentManagement\Domain\Services\ConsecutiveAppointmentService;
+use Core\BoundedContext\AppointmentManagement\Domain\ValueObjects\AppointmentStatus;
 use Illuminate\Support\Facades\Event;
+use Core\BoundedContext\AppointmentManagement\Infrastructure\Persistence\ScheduleConfigRepository;
 
 final class ConfirmAppointmentHandler
 {
     public function __construct(
-        private AppointmentRepositoryInterface $repository
+        private AppointmentRepositoryInterface $repository,
+        private ConsecutiveAppointmentService $consecutiveAppointmentService
     ) {}
 
-    public function handle(ConfirmAppointmentCommand $command): AppointmentDto
+    public function handle(ConfirmAppointmentCommand $command): AppointmentDTO
     {
-        $appointment = $this->repository->findById(
-            $command->appointmentId(),
-            $command->centerKey()
-        );
-
-        if ($appointment === null) {
-            throw AppointmentNotFoundException::withId(
-                $command->appointmentId(),
-                $command->centerKey()
-            );
+        $mainAppointment = $this->repository->findById($command->appointmentId, $command->centerKey);
+        if ($mainAppointment === null) {
+            throw new AppointmentNotFoundException($command->appointmentId);
         }
 
-        $confirmedAppointment = $appointment->confirm();
+        // Encontrar todas las citas del paciente para ese día
+        $allAppointments = $this->repository->findByPatientAndDate(
+            $mainAppointment->patientId(),
+            $mainAppointment->date()->format('Y-m-d')
+        );
 
-        $this->repository->save($confirmedAppointment);
+        // Encontrar el bloque de citas consecutivas usando el servicio de dominio
+        $consecutiveAppointments = $this->consecutiveAppointmentService->findConsecutiveBlock($mainAppointment, $allAppointments);
 
-        // Disparar evento de dominio
-        Event::dispatch(new AppointmentConfirmed(
-            $confirmedAppointment->id(),
-            $confirmedAppointment->centerKey(),
-            $confirmedAppointment->patientPhone(),
-            $confirmedAppointment->scheduledAt()->format('Y-m-d H:i:s')
-        ));
+        // Primero, validar todo el bloque
+        foreach ($consecutiveAppointments as $appointment) {
+            if ($appointment->status() === AppointmentStatus::Cancelled) {
+                throw new \InvalidArgumentException('No puedes confirmar una cita que ya ha sido cancelada.');
+            }
+        }
 
-        return AppointmentDto::fromEntity($confirmedAppointment);
+        // Si la validación pasa, proceder a confirmar
+        foreach ($consecutiveAppointments as $appointment) {
+            if ($appointment->status() !== AppointmentStatus::Confirmed) {
+                $appointment->confirm($command->confirmationChannelId, $command->confirmationChannelType);
+                $this->repository->save($appointment);
+            }
+        }
+
+        return AppointmentDTO::fromDomain($mainAppointment);
     }
 }

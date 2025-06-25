@@ -7,10 +7,9 @@ namespace Core\BoundedContext\AppointmentManagement\Domain\Events;
 final class AppointmentConfirmed
 {
     public function __construct(
-        private string $appointmentId,
-        private string $centerKey,
-        private string $patientPhone,
-        private string $scheduledAt
+        public readonly string $appointmentId,
+        public readonly string $patientPhone,
+        public readonly string $scheduledDateTime
     ) {}
 
     public function appointmentId(): string
@@ -18,18 +17,13 @@ final class AppointmentConfirmed
         return $this->appointmentId;
     }
 
-    public function centerKey(): string
-    {
-        return $this->centerKey;
-    }
-
     public function patientPhone(): string
     {
         return $this->patientPhone;
     }
 
-    public function scheduledAt(): string
+    public function scheduledDateTime(): string
     {
-        return $this->scheduledAt;
+        return $this->scheduledDateTime;
     }
 }

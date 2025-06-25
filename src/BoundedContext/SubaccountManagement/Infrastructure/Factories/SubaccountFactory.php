@@ -28,8 +28,13 @@ final class SubaccountFactory
                 $key,
                 $config['name'],
                 SubaccountConfig::fromArray([
+                    'key' => $key,
+                    'name' => $config['name'],
                     'connection' => $config['connection'],
                     'tables' => $config['tables'],
+                    'connections' => $config['connections'] ?? [],
+                    'api_header' => $config['api_header'] ?? null,
+                    'api_key' => $config['api_key'] ?? null,
                 ])
             );
 

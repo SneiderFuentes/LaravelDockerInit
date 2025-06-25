@@ -3,7 +3,6 @@
 namespace Core\BoundedContext\CommunicationManagement\Application\Handlers;
 
 use Core\BoundedContext\CommunicationManagement\Application\Commands\SendWhatsAppTemplateCommand;
-use Core\BoundedContext\CommunicationManagement\Domain\Entities\Message;
 use Core\BoundedContext\CommunicationManagement\Domain\Services\CommunicationService;
 
 class SendWhatsAppTemplateHandler
@@ -12,7 +11,7 @@ class SendWhatsAppTemplateHandler
         private CommunicationService $communicationService
     ) {}
 
-    public function handle(SendWhatsAppTemplateCommand $command): Message
+    public function handle(SendWhatsAppTemplateCommand $command): string
     {
         return $this->communicationService->sendWhatsAppTemplate(
             $command->getAppointmentId(),

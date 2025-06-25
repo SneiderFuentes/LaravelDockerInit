@@ -9,9 +9,9 @@ use DateTime;
 final class ListPendingAppointmentsQuery
 {
     public function __construct(
-        private string $centerKey,
-        private DateTime $startDate,
-        private DateTime $endDate
+        public string $centerKey,
+        public ?DateTime $startDate = null,
+        public ?DateTime $endDate = null
     ) {
         if (empty($centerKey)) {
             throw new \InvalidArgumentException('Center key cannot be empty');

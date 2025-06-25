@@ -1,12 +1,12 @@
 # docker-compose.yml
 services:
-
     app: &app-base
         build:
             context: .
             dockerfile: docker/php/Dockerfile
         image: appointments_app
         container_name: appointments_app
+        restart: unless-stopped
         working_dir: /var/www
         # inyectamos todo lo de .env en el contenedor
         env_file:
@@ -14,20 +14,32 @@ services:
         # montamos tu código
         volumes:
             - ./:/var/www
+        # Agregamos configuración para acceder al host
+        extra_hosts:
+            - "host.docker.internal:host-gateway"
         networks:
             - appnet
         depends_on:
             - db
             - redis
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "7"
+        environment:
+            - TZ=America/Bogota
 
     db:
         image: mysql:8.0
         container_name: appointments_db
+        restart: unless-stopped
         environment:
             MYSQL_ROOT_PASSWORD: secret
             MYSQL_DATABASE: appointments
             MYSQL_USER: appuser
             MYSQL_PASSWORD: apppass
+            TZ: America/Bogota
         ports:
             - "3307:3306"
         volumes:
@@ -35,16 +47,32 @@ services:
             - ./docker/mysql/init:/docker-entrypoint-initdb.d
         networks:
             - appnet
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "7"
 
     redis:
         image: redis:7-alpine
         container_name: appointments_redis
+        restart: unless-stopped
+        volumes:
+            - redisdata:/data
         networks:
             - appnet
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "7"
+        environment:
+            - TZ=America/Bogota
 
     nginx:
         image: nginx:stable-alpine
         container_name: appointments_nginx
+        restart: unless-stopped
         ports:
             - "80:80"
         volumes:
@@ -54,24 +82,87 @@ services:
             - app
         networks:
             - appnet
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "7"
+        environment:
+            - TZ=America/Bogota
 
     horizon:
         <<: *app-base
         container_name: appointments_horizon
+        restart: unless-stopped
         # inyectamos las mismas vars que en app
         env_file:
             - .env
         # sobreescribimos solo el comando de arranque
-        command: [ "php", "artisan", "horizon" ]
+        command: ["php", "artisan", "horizon"]
+        # Agregamos configuración para acceder al host (heredado de app-base)
         depends_on:
             - redis
             - db
         networks:
             - appnet
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "7"
+        environment:
+            - TZ=America/Bogota
+
+    ngrok:
+        image: ngrok/ngrok:latest # entrypoint = "ngrok"
+        container_name: appointments_ngrok
+        restart: unless-stopped
+        depends_on:
+            - nginx
+        environment:
+            NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN}
+            TZ: America/Bogota
+        # ⬇️ El comando se pasa SIN repetir la palabra 'ngrok'
+        command:
+            - "http" # sub-comando
+            - "nginx:80" # <host interno>:<puerto>
+            - "--log=stdout" # para ver la URL con docker logs
+        ports:
+            - "4040:4040"
+        networks:
+            - appnet
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "7"
+
+    scheduler:
+        <<: *app-base
+        container_name: appointments_scheduler
+        restart: unless-stopped
+        command:
+            [
+                "sh",
+                "-c",
+                "while :; do php artisan schedule:run --verbose --no-interaction & sleep 60; done",
+            ]
+        depends_on:
+            - db
+            - redis
+        networks:
+            - appnet
+        logging:
+            driver: "json-file"
+            options:
+                max-size: "10m"
+                max-file: "7"
+        environment:
+            - TZ=America/Bogota
 
 volumes:
     dbdata:
-
+    redisdata:
 
 networks:
     appnet:

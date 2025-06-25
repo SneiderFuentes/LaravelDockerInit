@@ -10,6 +10,6 @@ final class AppointmentNotFoundException extends Exception
 {
     public static function withId(string $id, string $centerKey): self
     {
-        return new self("Appointment with id '{$id}' not found in center '{$centerKey}'");
+        return new self("La cita que intenta acceder no fue encontrada o ya no existe.");
     }
 }

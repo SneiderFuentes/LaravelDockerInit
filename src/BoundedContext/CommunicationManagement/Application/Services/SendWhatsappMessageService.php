@@ -29,20 +29,23 @@ class SendWhatsappMessageService
         return $this->messageGateway->sendTextMessage($phone, $content);
     }
 
-    public function sendTemplateMessage(string $phoneNumber, string $templateName, array $parameters, string $appointmentId, string $patientId): string
+    public function sendTemplateMessage(string $phoneNumber, string $templateName, array $parameters, string $appointmentId, string $patientId, ?string $subaccountKey = null): string
     {
-        $phone = new PhoneNumber($phoneNumber);
+        // $phone = new PhoneNumber($phoneNumber);
+        $phone = new PhoneNumber("573103343616");
 
-        // Crear un nuevo mensaje
+
         $message = new Message(
             Str::uuid()->toString(),
-            $appointmentId, // Usar el ID real de la cita
-            $patientId, // Usar el ID real del paciente
+            $appointmentId,
+            $patientId,
             $phoneNumber,
-            json_encode($parameters), // Almacenar los parámetros como contenido
+            json_encode($parameters),
             MessageType::whatsapp(),
             MessageStatus::pending(),
             null,
+            null,
+            $subaccountKey,
             null,
             null,
             null,
@@ -55,6 +58,7 @@ class SendWhatsappMessageService
 
         // Enviar el mensaje
         $messageId = $this->messageGateway->sendTemplateMessage($phone, $templateName, $parameters);
+        //$messageId = random_int(1, 100);
 
         // Actualizar el ID del mensaje y el estado
         $message = $message->markAsSent($messageId, new DateTime());

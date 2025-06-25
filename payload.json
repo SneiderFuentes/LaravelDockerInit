@@ -1,0 +1,46 @@
+{
+    "source": "channel",
+    "to": "+573103343616",
+    "channelId": "59cbfb32-cf23-5dad-9abd-894f050a695e",
+    "reference": "cita-12345",
+    "callFlow": {
+      "steps": [
+        {
+          "action": "say",
+          "options": {
+            "payload": "Hola Juan Pérez. Su cita médica es el lunes 28 de abril a las dos de la tarde. Presione 1 para confirmar o 2 para cancelar. " ,
+            "language": "es-ES",
+            "voice": "female"
+          }
+        },
+        {
+          "action": "gather",
+          "options": {
+            "maxDigits": 1,
+            "timeoutInSeconds": 8
+          }
+        },
+        {
+          "action": "record-event",
+          "options": { "event": "APPOINTMENT_RESPONSE" }
+        },
+        {
+          "action": "run",
+          "options": {
+            "if": "{{dtmf}} == '1'",
+            "steps": [
+              { "action": "say",
+                "options": { "payload": "¡Gracias! Su cita ha sido confirmada." } }
+            ],
+            "else": [
+              { "action": "say",
+                "options": { "payload": "Entendido. Su cita ha sido cancelada." } }
+            ]
+          }
+        }
+      ]
+    },
+    "webhook": {
+      "eventUrl": ["https://953e-181-51-34-164.ngrok-free.app/api/webhooks/bird"]
+    }
+  }

@@ -19,6 +19,8 @@ final class SubaccountModel extends Model
         'name',
         'connection',
         'tables',
+        'api_header',
+        'api_key',
     ];
 
     protected $casts = [

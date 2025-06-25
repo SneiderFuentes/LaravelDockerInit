@@ -29,4 +29,8 @@ interface SubaccountRepositoryInterface
      * @return Subaccount[]
      */
     public function findAll(): array;
+
+    /**
+     * Limpiar el caché de configuración de subcuentas
+     */
 }

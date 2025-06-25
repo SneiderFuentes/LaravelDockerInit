@@ -66,6 +66,7 @@ class MessageController extends Controller
      */
     public function webhook(Request $request): JsonResponse
     {
+        dd($request->all());
         // Validar firma del webhook si está configurado
         $webhookSecret = config('messagebird.webhook_secret');
 

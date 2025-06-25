@@ -22,15 +22,24 @@ interface CommunicationService
     ): Message;
 
     /**
-     * Envía un mensaje WhatsApp al paciente usando una plantilla preaprobada.
+     * Send a WhatsApp template message
+     *
+     * @param string $appointmentId
+     * @param string $patientId
+     * @param string $phoneNumber
+     * @param string $templateName
+     * @param array $parameters
+     * @param string|null $subaccountKey
+     * @return string Message ID
      */
     public function sendWhatsAppTemplate(
         string $appointmentId,
         string $patientId,
         string $phoneNumber,
         string $templateName,
-        array $parameters
-    ): Message;
+        array $parameters,
+        ?string $subaccountKey = null
+    ): string;
 
     /**
      * Envía un mensaje SMS al paciente.

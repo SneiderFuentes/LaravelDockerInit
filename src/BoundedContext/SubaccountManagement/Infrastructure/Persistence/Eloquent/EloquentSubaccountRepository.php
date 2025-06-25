@@ -15,7 +15,6 @@ final class EloquentSubaccountRepository implements SubaccountRepositoryInterfac
     public function findByKey(string $key): ?Subaccount
     {
         $model = SubaccountModel::where('key', $key)->first();
-
         if ($model === null) {
             return null;
         }
@@ -43,6 +42,8 @@ final class EloquentSubaccountRepository implements SubaccountRepositoryInterfac
         $model->name = $subaccount->name();
         $model->connection = $subaccount->config()->connection();
         $model->tables = json_encode($subaccount->config()->tables());
+        $model->api_header = $subaccount->config()->apiHeader();
+        $model->api_key = $subaccount->config()->apiKey();
 
         $model->save();
     }
@@ -61,11 +62,16 @@ final class EloquentSubaccountRepository implements SubaccountRepositoryInterfac
             $model->key,
             $model->name,
             new SubaccountConfig(
+                $model->key,
+                $model->name,
                 $model->connection,
-                json_decode($model->tables, true)
+                json_decode($model->tables, true),
+                [],
+                $model->api_header ?? null,
+                $model->api_key ?? null
             ),
-            new DateTime($model->created_at),
-            new DateTime($model->updated_at)
+            new DateTime($model->created_at->format('Y-m-d H:i:s')),
+            new DateTime($model->updated_at->format('Y-m-d H:i:s'))
         );
     }
 }

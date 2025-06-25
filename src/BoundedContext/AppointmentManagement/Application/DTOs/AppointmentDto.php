@@ -6,102 +6,105 @@ namespace Core\BoundedContext\AppointmentManagement\Application\DTOs;
 
 use Core\BoundedContext\AppointmentManagement\Domain\Entities\Appointment;
 use Core\BoundedContext\AppointmentManagement\Domain\ValueObjects\AppointmentStatus;
+use Core\BoundedContext\AppointmentManagement\Domain\ValueObjects\ConfirmationChannelType;
 use DateTime;
 
-final class AppointmentDto
+final class AppointmentDTO
 {
-    private function __construct(
-        private string $id,
-        private string $centerKey,
-        private string $patientId,
-        private string $patientName,
-        private string $patientPhone,
-        private DateTime $scheduledAt,
-        private AppointmentStatus $status,
-        private ?string $notes
-    ) {}
+    private ?string $cupAddress = null;
+    private ?string $cupPreparation = null;
+    private ?array $doctorData = null;
+    private ?array $cupData = null;
 
-    public static function fromEntity(Appointment $appointment): self
+    private function __construct(
+        public readonly string $id,
+        public readonly string $patientId,
+        public readonly string $patientName,
+        public readonly string $patientPhone,
+        public readonly string $doctorId,
+        public readonly DateTime $date,
+        public readonly string $timeSlot,
+        public readonly string $entity,
+        public readonly int $agendaId,
+        public readonly AppointmentStatus $status,
+        public readonly ?DateTime $confirmationDate,
+        public readonly ?DateTime $cancellationDate,
+        public readonly ?string $cancellationReason,
+        public readonly ?string $confirmationChannelId,
+        public readonly ?ConfirmationChannelType $confirmationChannelType,
+        public readonly ?int $cupId,
+        ?array $doctorData = null,
+        ?array $cupData = null
+    ) {
+        $this->doctorData = $doctorData;
+        $this->cupData = $cupData;
+    }
+
+    public static function fromDomain(Appointment $appointment): self
     {
         return new self(
             $appointment->id(),
-            $appointment->centerKey(),
             $appointment->patientId(),
             $appointment->patientName(),
             $appointment->patientPhone(),
-            $appointment->scheduledAt(),
+            $appointment->doctorId(),
+            $appointment->date(),
+            $appointment->timeSlot(),
+            $appointment->entity(),
+            $appointment->agendaId(),
             $appointment->status(),
-            $appointment->notes()
+            $appointment->confirmationDate(),
+            $appointment->cancellationDate(),
+            $appointment->cancellationReason(),
+            $appointment->confirmationChannelId(),
+            $appointment->getConfirmationChannelType(),
+            $appointment->cupId(),
+            $appointment->doctorData,
+            $appointment->cupData
         );
     }
 
-    public function id(): string
+    /**
+     * Set CUP information for the appointment
+     */
+    public function setCupInfo(?string $address, ?string $preparation): void
     {
-        return $this->id;
-    }
-
-    public function centerKey(): string
-    {
-        return $this->centerKey;
-    }
-
-    public function patientId(): string
-    {
-        return $this->patientId;
-    }
-
-    public function patientName(): string
-    {
-        return $this->patientName;
-    }
-
-    public function patientPhone(): string
-    {
-        return $this->patientPhone;
-    }
-
-    public function scheduledAt(): DateTime
-    {
-        return $this->scheduledAt;
-    }
-
-    public function scheduledAtFormatted(string $format = 'Y-m-d H:i'): string
-    {
-        return $this->scheduledAt->format($format);
-    }
-
-    public function status(): AppointmentStatus
-    {
-        return $this->status;
-    }
-
-    public function statusValue(): string
-    {
-        return $this->status->value;
-    }
-
-    public function statusLabel(): string
-    {
-        return $this->status->label();
-    }
-
-    public function notes(): ?string
-    {
-        return $this->notes;
+        $this->cupAddress = $address;
+        $this->cupPreparation = $preparation;
     }
 
     public function toArray(): array
     {
         return [
             'id' => $this->id,
-            'center_key' => $this->centerKey,
             'patient_id' => $this->patientId,
             'patient_name' => $this->patientName,
             'patient_phone' => $this->patientPhone,
-            'scheduled_at' => $this->scheduledAt->format('Y-m-d H:i:s'),
+            'doctor_id' => $this->doctorId,
+            'date' => $this->date->format('Y-m-d'),
+            'time_slot' => $this->formatTimeSlot($this->timeSlot),
+            'entity' => $this->entity,
+            'agenda_id' => $this->agendaId,
             'status' => $this->status->value,
-            'status_label' => $this->status->label(),
-            'notes' => $this->notes,
+            'confirmation_date' => $this->confirmationDate?->format('Y-m-d H:i:s'),
+            'cancellation_date' => $this->cancellationDate?->format('Y-m-d H:i:s'),
+            'cancellation_reason' => $this->cancellationReason,
+            'confirmation_channel_id' => $this->confirmationChannelId,
+            'confirmation_channel_type' => $this->confirmationChannelType?->value,
+            'cup_id' => $this->cupId,
+            'doctor_data' => $this->doctorData,
+            'cup_data' => $this->cupData,
         ];
+    }
+
+    private function formatTimeSlot(string $timeSlot): ?string
+    {
+        // Asumiendo formato YYYYMMDDHHMM
+        if (strlen($timeSlot) === 12) {
+            $hour = substr($timeSlot, 8, 2);
+            $minute = substr($timeSlot, 10, 2);
+            return $hour . ':' . $minute;
+        }
+        return $timeSlot;
     }
 }

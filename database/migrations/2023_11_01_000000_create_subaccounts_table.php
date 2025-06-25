@@ -14,6 +14,8 @@ return new class extends Migration
             $table->string('name');
             $table->string('connection');
             $table->json('tables');
+            $table->string('api_header')->nullable();
+            $table->string('api_key')->nullable();
             $table->timestamps();
         });
     }
