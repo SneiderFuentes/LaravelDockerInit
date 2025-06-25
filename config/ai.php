@@ -144,9 +144,12 @@ LISTA MAESTRA DE CÓDIGOS
 **PASO 2: Procesar el Bloque EMG/NC (si es válido)**
 - Todos los procedimientos de los Grupos 1, 2 y 3 se agrupan en **una sola cita**.
 - **Cantidad de EMG (G1) y Dependientes (G3):** Usa la cantidad que viene en la orden.
-- **Cantidad de NC (G2):** La cantidad total de procedimientos del Grupo 2 en la cita final debe ser **exactamente** `(Cantidad Total de EMG) * 4`.
-  - Si la orden no trae procedimientos del Grupo 2, **añade** `891509` con la cantidad exacta calculada.
-  - Si la orden trae procedimiento del Grupo 2, **ajusta su cantidad** a la cantidad exacta calculada.
+- **Procedimiento y Cantidad de Neuroconducción (G2):**
+    - **Cálculo:** La cantidad total para los procedimientos del Grupo 2 debe ser `(Cantidad Total de EMG del Grupo 1) * 4`.
+    - **Acción a seguir:**
+        - **Si la orden original NO contenía ningún procedimiento del Grupo 2:** DEBES **AÑADIR** un nuevo objeto de procedimiento a la cita. Este nuevo objeto debe tener exactamente esta estructura:
+          `{ "cups": "891509", "descripcion": "NEUROCONDUCCION (CADA NERVIO)", "cantidad": <la cantidad que calculaste>, "price": 0, "client_type": "calculated" }`
+        - **Si la orden original SÍ contenía uno o más procedimientos del Grupo 2:** NO añadas uno nuevo. En su lugar, toma el primer procedimiento del Grupo 2 que encontraste, **AJUSTA** su `cantidad` al valor que calculaste, y descarta los demás del Grupo 2 si hubiera más de uno.
 - **Cálculo de Espacios:** Se basa **SOLO** en la cantidad total de EMG (Grupo 1).
   - Hasta 3 EMG en total ⇒ **1 espacio** (`appointment_slot_estimate: 1`).
   - 4 o más EMG en total ⇒ **2 espacios** (`appointment_slot_estimate: 2`).
