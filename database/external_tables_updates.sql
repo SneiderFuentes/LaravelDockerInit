@@ -186,7 +186,7 @@ VALUES
 (TERCER PISO)', NULL, NULL, 'examen', NULL, '1'),
 ('27', '954622', 'POTENCIALES EVOCADOS AUDITIVOS DE TALLO CEREBRAL (24)', 'POTENCIALES EVOCADOS AUDITIVOS DE TALLO CEREBRAL (24)', '11.0', '47', 'Para la toma del examen el paciente debe tener un trasnocho y ayuno de 2 a 3 horas antes de la hora de la cita, además el acompañante deberá traer un tetero. Por favor no dejar dormir el paciente hasta que el medico durante el examen lo indique ', 'Calle 35 # 36 – 26 Antiguo edificio Clínica Martha
 (TERCER PISO)', NULL, NULL, 'examen', NULL, '1'),
-('28', '891509-1', 'NEUROCONDUCCIÓN (CADA NERVIO) - PEDIÁTRICA', 'NEUROCONDUCCIÓN (CADA NERVIO) - PEDIÁTRICA', '9.0', '47', 'Para la toma del examen no debe de aplicarse ningún producto en el cuerpo, (cremas, aceites y talcos), y venir con ropa cómoda.', 'Calle 35 # 36 – 26 Antiguo edificio Clínica Martha
+('28', '891509', 'NEUROCONDUCCIÓN (CADA NERVIO) - PEDIÁTRICA', 'NEUROCONDUCCIÓN (CADA NERVIO) - PEDIÁTRICA', '9.0', '47', 'Para la toma del examen no debe de aplicarse ningún producto en el cuerpo, (cremas, aceites y talcos), y venir con ropa cómoda.', 'Calle 35 # 36 – 26 Antiguo edificio Clínica Martha
 (TERCER PISO)', NULL, NULL, 'examen', NULL, '1'),
 ('29', '891530-1', 'POTENCIALES EVOCADOS SOMATOSENSORIALES (CADA EXTREMIDAD) - PEDIÁTRICA', 'POTENCIALES EVOCADOS SOMATOSENSORIALES (CADA EXTREMIDAD) - PEDIÁTRICA', '11.0', '47', 'Para la toma del examen el paciente debe tener un trasnocho y ayuno de 2 a 3 horas antes de la hora de la cita, además el acompañante deberá traer un tetero. Por favor no dejar dormir el paciente hasta que el medico durante el examen lo indique ', 'Calle 35 # 36 – 26 Antiguo edificio Clínica Martha
 (TERCER PISO)', NULL, NULL, 'examen', NULL, '1'),
