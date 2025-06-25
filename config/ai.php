@@ -35,19 +35,25 @@ Devuelve SOLO un JSON con este formato (sin texto extra):
     "observaciones_generales":"<string>"
 }
 }
-Reglas:
-• Tabla de procedimientos: busca encabezados "Código", "Descripción", "Cantidad" o similares.
-• Extracción de CUPS (Proceso por Prioridades):
-    1. **Prioridad 1: Código en el texto.** Busca un código CUPS de 4 a 6 dígitos directamente en la descripción o en una columna de código. Si encuentras uno claro y completo, úsalo. Este es el valor más fiable.
-    2. **Prioridad 2: Descripción + Lista de referencia.** Si el código numérico leído por OCR no es claro, está incompleto o ausente, entonces:
-        a. Toma la descripción del procedimiento leída de la imagen.
-        b. Compárala con las descripciones en la lista de referencia proporcionada.
-        c. Elige el CUPS que corresponda a la descripción **más similar semánticamente**.
-    3. **Corrección de OCR:** Usa la lista para corregir pequeños errores de lectura en códigos (ej. 'O' por '0', 'S' por '5'), pero no para reemplazar un código que ya es válido y claramente visible.
-• Cantidad: Extrae solo el número entero. Ignora por completo los decimales y cualquier texto adicional (ej: de "2.0 (DOS) AMB", extrae solo 2). Si no encuentras un número claro, usa 1.
-• Observaciones: anota dudas o "".
-• Si no hay tabla: {"error":"no_table_detected"}.
-Devuelve solo JSON.
+**Sigue este proceso de decisión para CADA procedimiento. Es obligatorio.**
+
+1.  **PRIORIDAD #1: ¿HAY UN CÓDIGO NUMÉRICO EN EL TEXTO?**
+    *   Revisa la línea del procedimiento en la imagen. ¿Ves un código de 4 a 6 dígitos (ej: `930860`, `891509`, `891515`)?
+    *   **Si la respuesta es SÍ:** Ese es el CUPS. Tómalo y úsalo. No necesitas hacer nada más para este procedimiento. **Tu análisis para este ítem TERMINA AQUÍ.**
+
+2.  **PRIORIDAD #2: BÚSQUEDA POR DESCRIPCIÓN (Solo si NO hay código en el texto)**
+    *   Si, y solo si, no pudiste encontrar un código numérico claro en el paso 1, harás lo siguiente:
+    *   a. Toma la descripción completa que leíste de la imagen.
+    *   b. **Ahora, revisa la lista de referencia COMPLETA, de principio a fin.** No te detengas en la primera similitud.
+    *   c. Compara la descripción de la imagen contra **CADA UNA** de las descripciones en la lista.
+    *   d. Después de haber revisado **TODA** la lista, selecciona el CUPS que corresponda a la descripción que sea la **coincidencia más fuerte y específica**. Una coincidencia de varias palabras clave es mejor que una de una sola.
+
+3.  **DATOS ADICIONALES:**
+    *   **Cantidad:** Extrae el número entero de la columna de cantidad. Si dice `2.0 (DOS) AMB`, el valor es `2`. Si no hay número, usa `1`.
+    *   **Observaciones:** Anota cualquier texto relevante adicional que no sea parte de la descripción principal (ej: `AMB`, `SUPERIORES`).
+
+*   Si no hay tabla de procedimientos: devuelve `{"error":"no_table_detected"}`.
+*   Devuelve solo JSON.
 
 {{cups_context}}
 
