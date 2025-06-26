@@ -18,7 +18,7 @@ class ScheduleConfigRepository extends BaseRepository implements ScheduleConfigR
         parent::__construct($configService);
     }
 
-    public function findByScheduleId($agendaId): ?array
+    public function findByScheduleId($agendaId, ?string $doctorDocument = null): ?array
     {
         $config = $this->getConfig();
         $table = $config->tables()['schedule_configs']['table'];
@@ -27,6 +27,9 @@ class ScheduleConfigRepository extends BaseRepository implements ScheduleConfigR
         $row = DB::connection($connection)
             ->table($table)
             ->where($mapping['agenda_id'], $agendaId)
+            ->when($doctorDocument, function ($query) use ($doctorDocument, $mapping) {
+                $query->where($mapping['doctor_document'], $doctorDocument);
+            })
             ->first();
         return $row ? ArrayMapper::mapToLogicalFields($row, $mapping) : null;
     }

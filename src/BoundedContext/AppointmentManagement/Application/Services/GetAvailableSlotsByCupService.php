@@ -10,6 +10,7 @@ use Core\BoundedContext\AppointmentManagement\Application\DTOs\AvailableSlotDTO;
 use Core\BoundedContext\AppointmentManagement\Domain\Repositories\CupProcedureRepositoryInterface;
 use Core\BoundedContext\AppointmentManagement\Domain\Repositories\ScheduleConfigRepositoryInterface;
 use Core\BoundedContext\AppointmentManagement\Domain\Repositories\AppointmentRepositoryInterface;
+use Illuminate\Support\Facades\Log;
 
 class GetAvailableSlotsByCupService
 {
@@ -41,6 +42,7 @@ class GetAvailableSlotsByCupService
         $doctores = $this->doctorRepository->findDoctorsByCupId($cupInfo['id']);
 
         $doctorDocuments = array_column($doctores, 'doctor_document');
+        Log::info('doctorDocuments', ['doctorDocuments' => $doctorDocuments]);
         $doctorMap = [];
         foreach ($doctores as $doctor) {
             $doctorMap[$doctor['doctor_document']] = $doctor['doctor_full_name'] ?? $doctor['doctor_document'];
@@ -48,6 +50,7 @@ class GetAvailableSlotsByCupService
         // Unir todos los días laborales futuros de todos los doctores
 
         $daysAllDoctors = $this->scheduleRepository->findFutureWorkingDaysByDoctors($doctorDocuments);
+        Log::info('daysAllDoctors', ['daysAllDoctors' => $daysAllDoctors]);
         $slots = [];
         $scheduleCache = [];
         $scheduleConfigCache = [];
@@ -58,18 +61,22 @@ class GetAvailableSlotsByCupService
             $doctorDocument = $day['doctor_document'];
             $doctorFullName = $doctorMap[$doctorDocument] ?? $doctorDocument;
 
-            if (isset($scheduleCache[$day['agenda_id']])) {
-                $schedule = $scheduleCache[$day['agenda_id']];
+            if ($day['agenda_id'] == 0) {
+                $schedule = ['id' => 0];
             } else {
-                $schedule = $this->scheduleRepository->findByScheduleId($day['agenda_id'], $cupInfo['type']);
-                $scheduleCache[$day['agenda_id']] = $schedule;
+                if (isset($scheduleCache[$day['agenda_id']])) {
+                    $schedule = $scheduleCache[$day['agenda_id']];
+                } else {
+                    $schedule = $this->scheduleRepository->findByScheduleId($day['agenda_id'], $cupInfo['type']);
+                    $scheduleCache[$day['agenda_id']] = $schedule;
+                }
+                if (!$schedule) continue;
             }
-            if (!$schedule) continue;
             // Cache de configuración de agenda
             if (isset($scheduleConfigCache[$schedule['id']])) {
                 $scheduleConfig = $scheduleConfigCache[$schedule['id']];
             } else {
-                $scheduleConfig = $this->scheduleConfigRepository->findByScheduleId($schedule['id']);
+                $scheduleConfig = $this->scheduleConfigRepository->findByScheduleId($schedule['id'], $doctorDocument);
                 $scheduleConfigCache[$schedule['id']] = $scheduleConfig;
             }
             if (!$scheduleConfig) continue;
