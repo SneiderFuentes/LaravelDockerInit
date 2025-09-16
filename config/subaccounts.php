@@ -192,6 +192,7 @@ return [
                         'description' => 'descripcion',
                         'specialty_id' => 'especialidad_id',
                         'service_id' => 'servicio_id',
+                        'service_name' => 'servicio',
                         'preparation' => 'preparacion',
                         'address' => 'direccion',
                         'video_url' => 'video_url',

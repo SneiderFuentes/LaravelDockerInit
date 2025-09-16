@@ -16,10 +16,12 @@ final class VisionMedicalOrderService
     /**
      * Recibe la ruta al archivo (imagen o PDF) y devuelve los datos extraídos.
      */
-    public function extract(string $filePath): array
+    public function extract(string $filePath, ?string $patientDocument = null): array
     {
         // 1. Obtener el prompt base desde la configuración
         $visionPrompt = config('ai.vision_prompt');
+
+        Log::info('----VISION PROMPT', ['api_key' => config('openai.api_key')]);
 
         // 2. Obtener la lista de CUPS y formatearla para el prompt
         $allCups = $this->cupRepository->findAll();
@@ -31,8 +33,14 @@ final class VisionMedicalOrderService
             }
         }
 
-        // 3. Reemplazar el marcador de posición en el prompt con la lista de CUPS
-        $promptWithContext = str_replace('{{cups_context}}', $cupsContext, $visionPrompt);
+        // 3. Agregar información del documento del paciente si está disponible
+        $promptWithDocument = str_replace('{{patient_document}}', $patientDocument, $visionPrompt);
+
+        $promptWithDate = str_replace('{{today_bogota}}', now()->format('Y-m-d'), $promptWithDocument);
+
+
+        // 4. Reemplazar el marcador de posición en el prompt con la lista de CUPS
+        $promptWithContext = str_replace('{{cups_context}}', $cupsContext, $promptWithDocument);
 
         // Obtener MIME y base64
         $mime = mime_content_type($filePath) ?: 'application/octet-stream';
@@ -73,6 +81,7 @@ final class VisionMedicalOrderService
 
             $response = OpenAI::chat()->create([
                 'model'    => 'gpt-4o-mini',
+                'response_format' => ['type' => 'json_object'],
                 'messages' => [
                     [
                         'role'    => 'system',
@@ -81,6 +90,10 @@ final class VisionMedicalOrderService
                     [
                         'role'    => 'user',
                         'content' => [
+                            [
+                                'type' => 'text',
+                                'text' => 'Analiza la siguiente orden médica en la imagen y aplica el proceso de decisión que te indiqué.',
+                            ],
                             [
                                 'type'      => 'image_url',
                                 'image_url' => [
@@ -93,6 +106,7 @@ final class VisionMedicalOrderService
                 'max_tokens'   => 1200,
                 'temperature'  => 0,
             ]);
+            Log::info('----RESPONSE', ['response' => $response]);
 
             $content = $response->choices[0]->message->content ?? '';
             $data = [];

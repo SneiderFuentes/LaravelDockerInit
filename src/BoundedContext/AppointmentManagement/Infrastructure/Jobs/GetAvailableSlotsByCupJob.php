@@ -35,19 +35,21 @@ class GetAvailableSlotsByCupJob implements ShouldQueue
     private array $procedures;
     private int $espacios;
     private string $resumeKey;
+    private int $patientAge;
 
-    public function __construct(array $procedures, int $espacios, string $resumeKey)
+    public function __construct(array $procedures, int $espacios, string $resumeKey, int $patientAge)
     {
         $this->procedures = $procedures;
         $this->espacios = $espacios;
         $this->resumeKey = $resumeKey;
+        $this->patientAge = $patientAge;
     }
 
     public function handle(GetAvailableSlotsByCupHandler $handler, WebhookNotifierService $notifier): void
     {
         Log::info('----OBTENER ESPACIOS Job en ejecución', ['attempts' => $this->attempts()]);
         try {
-            $slots = $handler->handle($this->procedures, $this->espacios);
+            $slots = $handler->handle($this->procedures, $this->espacios, $this->patientAge);
 
             $selectionText = '';
             if (!empty($slots)) {

@@ -27,7 +27,7 @@ class GetAvailableSlotsByCupService
      * @param int $espacios
      * @return AvailableSlotDTO[]
      */
-    public function execute(array $procedures, int $espacios): array
+    public function execute(array $procedures, int $espacios, int $patientAge): array
     {
         if (empty($procedures) || empty($procedures[0]['cups'])) {
             return [];
@@ -41,10 +41,12 @@ class GetAvailableSlotsByCupService
 
         $doctores = $this->doctorRepository->findDoctorsByCupId($cupInfo['id']);
 
-        $doctorDocuments = array_column($doctores, 'doctor_document');
-        Log::info('doctorDocuments', ['doctorDocuments' => $doctorDocuments]);
+        // Filtrar doctores que no atienden pacientes de cierta edad usando array estático
+        $doctoresFiltrados = $this->filterDoctorsByAge($doctores, $patientAge);
+
+        $doctorDocuments = array_column($doctoresFiltrados, 'doctor_document');
         $doctorMap = [];
-        foreach ($doctores as $doctor) {
+        foreach ($doctoresFiltrados as $doctor) {
             $doctorMap[$doctor['doctor_document']] = $doctor['doctor_full_name'] ?? $doctor['doctor_document'];
         }
         // Unir todos los días laborales futuros de todos los doctores
@@ -178,5 +180,34 @@ class GetAvailableSlotsByCupService
             return $value;
         }
         return $value;
+    }
+
+    /**
+     * Filtra doctores que no atienden pacientes de cierta edad usando array estático
+     * Array estático: documento_doctor => edad_mínima_que_atiene
+     */
+    private function filterDoctorsByAge(array $doctores, int $patientAge): array
+    {
+        $doctorAgeRestrictions = [
+            '74372158' => 5,
+            '7178922' => 18
+        ];
+
+        $filteredDoctors = [];
+        foreach ($doctores as $doctor) {
+            $doctorDocument = $doctor['doctor_document'];
+
+            if (isset($doctorAgeRestrictions[$doctorDocument])) {
+                $minAge = $doctorAgeRestrictions[$doctorDocument];
+
+                if ($patientAge < $minAge) {
+                    continue;
+                }
+            }
+
+            $filteredDoctors[] = $doctor;
+        }
+
+        return $filteredDoctors;
     }
 }

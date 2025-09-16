@@ -51,36 +51,36 @@ class PlanAppointmentsJob implements ShouldQueue
             $alreadyScheduledProcedures = $enrichResult['already_scheduled'];
 
             // 1. Agrupar procedimientos por especialidad_id
-            $proceduresBySpecialty = [];
+            $proceduresByServiceName = [];
             foreach ($enrichedProcedures as $proc) {
-                $specialtyId = $proc['specialty_id'] ?? 'default';
-                $proceduresBySpecialty[$specialtyId][] = $proc;
+                $serviceName = $proc['service_name'] ?? 'default';
+                $proceduresByServiceName[$serviceName][] = $proc;
             }
             Log::info('Procedures enrichment result', [
                 'plan_id' => $this->planId,
                 'enriched_procedures' => $enrichedProcedures,
                 'rejected_procedures' => $rejectedProcedures,
                 'already_scheduled_procedures' => $alreadyScheduledProcedures,
-                'procedures_by_specialty' => $proceduresBySpecialty,
+                'procedures_by_service_name' => $proceduresByServiceName,
                 'enriched_count' => count($enrichedProcedures),
                 'rejected_count' => count($rejectedProcedures)
             ]);
             $allGroupedAppointments = [];
 
             // 2. Iterar sobre cada grupo de especialidad y llamar a la IA
-            foreach ($proceduresBySpecialty as $specialtyId => $procedures) {
+            foreach ($proceduresByServiceName as $serviceName => $procedures) {
                 $defaultPrompt = config('ai.appointment_grouping_prompts.default');
-                $specialtyPrompt = config("ai.appointment_grouping_prompts.{$specialtyId}");
+                $servicePrompt = config("ai.appointment_grouping_prompts.{$serviceName}");
 
                 $prompt = $defaultPrompt;
-                if ($specialtyPrompt) {
-                    $prompt .= "\n\n" . $specialtyPrompt;
+                if ($servicePrompt) {
+                    $prompt .= "\n\n" . $servicePrompt;
                 }
 
                 Log::info(
                     'Sending request to AI for appointment grouping',
                     [
-                        'specialty_id' => $specialtyId,
+                        'service_name' => $serviceName,
                         'procedures_count' => count($procedures),
                         'prompt' => $prompt
                     ]
@@ -227,6 +227,7 @@ class PlanAppointmentsJob implements ShouldQueue
             }
             $proc['service_id'] = $cupData['service_id'];
             $proc['specialty_id'] = $cupData['specialty_id'];
+            $proc['service_name'] = $cupData['service_name'];
             $enriched[] = $proc;
         }
 

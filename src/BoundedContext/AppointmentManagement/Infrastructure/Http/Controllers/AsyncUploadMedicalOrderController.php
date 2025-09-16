@@ -20,11 +20,14 @@ class AsyncUploadMedicalOrderController extends Controller
             'file_url'     => 'required|string',
             'image_url'    => 'required|string',
             'content_type' => 'required|string',
+            'patient_document' => 'required|string',
         ]);
         $fileUrl = $request->input('file_url');
         $imageUrl = $request->input('image_url');
         $url = $fileUrl == 'no_url' ? $imageUrl : $fileUrl;
         $contentType = $request->input('content_type');
+        $patientDocument = $request->input('patient_document');
+        Log::info('----PATIENT DOCUMENT', ['patient_document' => $patientDocument]);
         $orderId = Str::uuid()->toString();
 
         if ($url === null || $contentType === null) {
@@ -32,7 +35,7 @@ class AsyncUploadMedicalOrderController extends Controller
         }
 
         $resumeKey = Str::uuid()->toString();
-        $job = new ParseMedicalOrderVisionJob($url, $contentType, $orderId, $resumeKey);
+        $job = new ParseMedicalOrderVisionJob($url, $contentType, $orderId, $resumeKey, $patientDocument);
         $job->onQueue('ai-vision');
 
         $delayInSeconds = app()->environment('production') ? (int)env('JOB_PROD_DELAY_SECONDS', 2) : (int)env('JOB_DEV_DELAY_SECONDS', 5);

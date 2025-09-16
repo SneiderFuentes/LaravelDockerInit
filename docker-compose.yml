@@ -14,7 +14,7 @@ services:
         # montamos tu código
         volumes:
             - ./:/var/www
-            - vendor-data:/var/www/vendor 
+            - vendor-data:/var/www/vendor
         # Agregamos configuración para acceder al host
         extra_hosts:
             - "host.docker.internal:host-gateway"
@@ -130,6 +130,7 @@ services:
         command:
             - "http" # sub-comando
             - "nginx:80" # <host interno>:<puerto>
+            - "--hostname=app.colibrixa.com"
             - "--log=stdout" # para ver la URL con docker logs
         ports:
             - "4040:4040"
@@ -171,7 +172,6 @@ volumes:
     dbdata:
     redisdata:
     vendor-data:
-
 
 networks:
     appnet:

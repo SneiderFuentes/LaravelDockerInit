@@ -19,12 +19,14 @@ class AsyncGetAvailableSlotsByCupController
             'appointment_slot_estimate' => 'required|integer|min:1',
             'procedures' => 'required|array|min:1',
             'procedures.*.cups' => 'required|string',
+            'patient_age' => 'required|integer|min:0|max:120',
         ]);
 
         $procedures = $validatedData['procedures'];
         $espacios = $validatedData['appointment_slot_estimate'];
+        $patientAge = $validatedData['patient_age'];
         $resumeKey = Str::uuid()->toString();
-        $job = new GetAvailableSlotsByCupJob($procedures, $espacios, $resumeKey);
+        $job = new GetAvailableSlotsByCupJob($procedures, $espacios, $resumeKey, $patientAge);
         $job->onQueue('notifications');
 
         $delayInSeconds = app()->environment('production') ? (int)env('JOB_PROD_DELAY_SECONDS', 2) : (int)env('JOB_DEV_DELAY_SECONDS', 5);
