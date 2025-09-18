@@ -253,6 +253,16 @@ return [
                         'is_active' => 'contratoactivo',
                     ],
                 ],
+                'municipios' => [
+                    'table' => 'municipios',
+                    'mapping' => [
+                        'id' => 'id',
+                        'department_code' => 'cod_departamento',
+                        'department_name' => 'departamento',
+                        'municipality_code' => 'cod_municipio',
+                        'municipality_name' => 'municipio',
+                    ],
+                ],
                 'soat_codes' => [
                     'table' => 'codigossoat',
                     'mapping' => [

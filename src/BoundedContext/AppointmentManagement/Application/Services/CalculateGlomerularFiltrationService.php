@@ -56,7 +56,6 @@ class CalculateGlomerularFiltrationService
             ],
             'temperature' => 0.0,
             'response_format' => ['type' => 'json_object'],
-            'timeout' => 30,
         ]);
 
         $content = $response->choices[0]->message->content;

@@ -14,7 +14,9 @@ class GetActiveEntitiesController
     public function __invoke(Request $request)
     {
         $entities = $this->handler->handle();
-        $lines = array_map(fn($e) => "{$e['code']} - {$e['name']}", $entities);
+        $lines = array_map(function($entity, $index) {
+            return ($index + 1) . " - {$entity['name']}";
+        }, $entities, array_keys($entities));
         $text = implode(PHP_EOL, $lines);
         return response($text, 200, ['Content-Type' => 'text/plain']);
     }

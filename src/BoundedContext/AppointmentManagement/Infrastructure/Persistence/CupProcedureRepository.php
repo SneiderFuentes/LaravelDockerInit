@@ -53,6 +53,12 @@ class CupProcedureRepository extends BaseRepository implements CupProcedureRepos
         $mappedData = ArrayMapper::mapToLogicalFields($cup, $mapping);
         Log::info('Cup data mapped', ['mapped_data' => $mappedData]);
         Log::info('Mapping config', ['mapping' => $mapping]);
+        Log::info('Service name mapping check', [
+            'servicio_field_exists' => isset($cup->servicio),
+            'servicio_value' => $cup->servicio ?? 'NOT_FOUND',
+            'service_name_in_mapping' => isset($mapping['service_name']),
+            'service_name_mapped_value' => $mappedData['service_name'] ?? 'NOT_MAPPED'
+        ]);
 
         return $mappedData;
     }

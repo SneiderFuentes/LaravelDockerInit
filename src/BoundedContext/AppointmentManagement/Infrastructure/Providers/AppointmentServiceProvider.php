@@ -71,6 +71,13 @@ final class AppointmentServiceProvider extends ServiceProvider
                 $app->make(\Core\BoundedContext\SubaccountManagement\Application\Services\GetSubaccountConfigService::class)
             );
         });
+
+        // MunicipalityRepository
+        $this->app->singleton(\Core\BoundedContext\AppointmentManagement\Domain\Repositories\MunicipalityRepositoryInterface::class, function ($app) {
+            return new \Core\BoundedContext\AppointmentManagement\Infrastructure\Persistence\MunicipalityRepository(
+                $app->make(\Core\BoundedContext\SubaccountManagement\Application\Services\GetSubaccountConfigService::class)
+            );
+        });
     }
 
     public function boot(): void

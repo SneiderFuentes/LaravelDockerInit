@@ -53,7 +53,22 @@ class EntityRepository extends BaseRepository implements EntityRepositoryInterfa
         $rows = DB::connection($connection)
             ->table($table)
             ->where($mapping['is_active'], -1)
+            ->orderBy($mapping['id'], 'asc')
             ->get();
         return $rows->map(fn($row) => ArrayMapper::mapToLogicalFields($row, $mapping))->toArray();
+    }
+
+    public function getEntityCodeByIndex(int $index): ?string
+    {
+        $entities = $this->findAllActive();
+
+        // El índice viene basado en 1, pero el array es basado en 0
+        $arrayIndex = $index - 1;
+
+        if ($arrayIndex < 0 || $arrayIndex >= count($entities)) {
+            return null;
+        }
+
+        return $entities[$arrayIndex]['code'] ?? null;
     }
 }

@@ -13,4 +13,11 @@ interface EntityRepositoryInterface
      * @return array
      */
     public function findAllActive(): array;
+
+    /**
+     * Obtiene el código de una entidad por su índice en la lista numerada
+     * @param int $index El número de la lista (basado en 1)
+     * @return string|null El código de la entidad o null si no existe
+     */
+    public function getEntityCodeByIndex(int $index): ?string;
 }
