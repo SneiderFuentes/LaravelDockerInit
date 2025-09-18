@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-until mysqladmin ping -h"$DB_HOST" --silent; do
+until mysql -h"$DB_HOST" -u"$DB_USERNAME" -p"$DB_PASSWORD" --skip-ssl -e "SELECT 1;" > /dev/null 2>&1; do
   >&2 echo "[Entrypoint] Esperando a MySQL…"
   sleep 2
 done

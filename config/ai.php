@@ -262,7 +262,7 @@ REGLAS (aplican en este orden; si una regla específica contradice una general, 
    - Si hay varios cups y no se especifica a cuál aplica, adjúntala al cup de mayor espacios.
 
 4) Regla general de “contrastada”
-   - Palabras clave en procedimiento u observaciones: “con contraste”, “contrastada”, “con perfusión”, “perfusión”, “dinámica” → usa el valor de contrastada de la tabla.
+   - Palabras clave en procedimiento u observaciones: “con contraste”, “contrastada”, “contraste”, “con perfusión”, “perfusión”, “dinámica”, “multiparamétrica” → usa el valor de contrastada de la tabla.
    - No overrides esta regla cuando apliquen las reglas 1 o 2 (que ya definen tiempos totales).
 
 5) Cálculo de espacios por cita (**ajustado a agrupación única**)

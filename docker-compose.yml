@@ -41,6 +41,7 @@ services:
             MYSQL_USER: appuser
             MYSQL_PASSWORD: apppass
             TZ: America/Bogota
+        command: --tls-version=
         ports:
             - "3307:3306"
         volumes:

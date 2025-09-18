@@ -7,6 +7,8 @@ use Illuminate\Support\Facades\DB;
 use Core\BoundedContext\SubaccountManagement\Application\Services\GetSubaccountConfigService;
 use Core\Shared\Infrastructure\Mapping\ArrayMapper;
 use Core\BoundedContext\AppointmentManagement\Infrastructure\Persistence\BaseRepository;
+use Illuminate\Support\Facades\Log;
+
 
 class CupProcedureRepository extends BaseRepository implements CupProcedureRepositoryInterface
 {
@@ -20,7 +22,7 @@ class CupProcedureRepository extends BaseRepository implements CupProcedureRepos
     {
         $config = $this->getConfig();
         $procedureConfig = $config->tables()['procedures'];
-        $connection = $procedureConfig['connection'] ?? $config->connection();
+        $connection = $procedureConfig['connection'] ?? $config->connection17338119();
         $table = $procedureConfig['table'];
         $mapping = $procedureConfig['mapping'];
         $cup = DB::connection($connection)
@@ -41,12 +43,16 @@ class CupProcedureRepository extends BaseRepository implements CupProcedureRepos
             ->table($table)
             ->where($mapping['code'], $cupCode)
             ->first();
+        Log::info('Cup data original', ['cup' => $cup]);
+        Log::info('Cup servicio field', ['servicio' => $cup->servicio ?? 'NOT_FOUND']);
 
         if (!$cup) {
             return null;
         }
 
         $mappedData = ArrayMapper::mapToLogicalFields($cup, $mapping);
+        Log::info('Cup data mapped', ['mapped_data' => $mappedData]);
+        Log::info('Mapping config', ['mapping' => $mapping]);
 
         return $mappedData;
     }
