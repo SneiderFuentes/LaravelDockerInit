@@ -9,25 +9,27 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Bus;
-use Illuminate\Support\Facades\Log;
+use Core\Shared\Infrastructure\Http\Traits\DispatchesJobsSafely;
 
 class AsyncUploadMedicalOrderController extends Controller
 {
+    use DispatchesJobsSafely;
+
     public function __invoke(Request $request): JsonResponse
     {
-        $request->validate([
+        $validatedData = $request->validate([
             'file_url'     => 'required|string',
             'image_url'    => 'required|string',
             'content_type' => 'required|string',
             'patient_document' => 'required|string',
         ]);
-        $fileUrl = $request->input('file_url');
-        $imageUrl = $request->input('image_url');
+
+        $fileUrl = $validatedData['file_url'];
+        $imageUrl = $validatedData['image_url'];
         $url = $fileUrl == 'no_url' ? $imageUrl : $fileUrl;
-        $contentType = $request->input('content_type');
-        $patientDocument = $request->input('patient_document');
-        Log::info('----PATIENT DOCUMENT', ['patient_document' => $patientDocument]);
+        $contentType = $validatedData['content_type'];
+        $patientDocument = $validatedData['patient_document'];
+
         $orderId = Str::uuid()->toString();
 
         if ($url === null || $contentType === null) {
@@ -38,14 +40,11 @@ class AsyncUploadMedicalOrderController extends Controller
         $job = new ParseMedicalOrderVisionJob($url, $contentType, $orderId, $resumeKey, $patientDocument);
         $job->onQueue('ai-vision');
 
-        $delayInSeconds = app()->environment('production') ? (int)env('JOB_PROD_DELAY_SECONDS', 2) : (int)env('JOB_DEV_DELAY_SECONDS', 5);
-        if ($delayInSeconds > 0) {
-            $job->delay(now()->addSeconds($delayInSeconds));
-        }
-        Log::info('----SUBIR ORDEN MEDICA Job despachado con ' . $delayInSeconds . ' segundos de retraso', [
-            'data' => $request->all()
-        ]);
-        Bus::dispatch($job);
+        $this->dispatchSafely(
+            $job,
+            '----SUBIR ORDEN MEDICA',
+            $validatedData
+        );
 
         return response()->json([
             'order_id'   => $orderId,

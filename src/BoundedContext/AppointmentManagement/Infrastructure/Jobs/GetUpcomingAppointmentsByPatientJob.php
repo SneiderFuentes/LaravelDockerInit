@@ -80,9 +80,20 @@ class GetUpcomingAppointmentsByPatientJob implements ShouldQueue
                     $detail .= "*Estado:* " . $formattedStatus . "\n";
 
                     // Añadir dirección si existe en los CUPs
-                    if (!empty($appointment['cup_data']) && !empty($appointment['cup_data'][0]['address'])) {
-                        $address = $appointment['cup_data'][0]['address'];
-                        $detail .= "*Dirección:* " . $address . "\n";
+                    $addressFound = false;
+                    if (!empty($appointment['cup_data'])) {
+                        foreach ($appointment['cup_data'] as $cup) {
+                            if (!empty($cup['address'])) {
+                                $detail .= $this->formatAddressWithMaps($cup['address']) . "\n";
+                                $addressFound = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    // Si no se encontró dirección, usar la por defecto
+                    if (!$addressFound) {
+                        $detail .= $this->formatAddressWithMaps('') . "\n";
                     }
                     $detail .= "\n";
 
@@ -102,9 +113,12 @@ class GetUpcomingAppointmentsByPatientJob implements ShouldQueue
                                 $preparation = $cup['preparation'];
                                 $preparationsText .= "- Para '" . $cupName . "': " . $preparation;
 
-                                // Añadir video_url si existe
+                                // Añadir video_url si existe, o usar video por defecto para pruebas
                                 if (!empty($cup['video_url'])) {
-                                    $preparationsText .= " (Ver video: " . $cup['video_url'] . ")";
+                                    $preparationsText .= "\n  📹 [Ver video](" . $cup['video_url'] . ")";
+                                } else {
+                                    // Video temporal por defecto para pruebas
+                                    $preparationsText .= "\n  📹 [Ver video de preparación](https://www.youtube.com/watch?v=dQw4w9WgXcQ)";
                                 }
                                 $preparationsText .= "\n";
                                 $hasPreparations = true;
@@ -144,5 +158,49 @@ class GetUpcomingAppointmentsByPatientJob implements ShouldQueue
             Log::error('GetUpcomingAppointmentsByPatientJob Error: ' . $e->getMessage(), ['exception' => $e]);
         }
         $notifier->notifyFromConfig($this->resumeKey, $payload, 'GetUpcomingAppointmentsByPatientJob - ');
+    }
+
+    /**
+     * Obtiene la URL de Google Maps para una dirección específica
+     */
+    private function getGoogleMapsUrl(string $address): string
+    {
+        $addressMaps = [
+            'Calle 35 # 36 26 Antiguo edificio Clinica Martha' => 'https://maps.app.goo.gl/yTzZymhe2Nba31Ff9',
+            'Calle 34 No 38-47 Barzal' => 'https://maps.app.goo.gl/MZqCxVoKAgwrnUVh7',
+        ];
+
+        // Buscar coincidencia exacta primero
+        if (isset($addressMaps[$address])) {
+            return $addressMaps[$address];
+        }
+
+        // Buscar coincidencia parcial para mayor flexibilidad
+        foreach ($addressMaps as $knownAddress => $url) {
+            if (strpos($address, 'Calle 35') !== false && strpos($knownAddress, 'Calle 35') !== false) {
+                return $url;
+            }
+            if (strpos($address, 'Calle 34') !== false && strpos($knownAddress, 'Calle 34') !== false) {
+                return $url;
+            }
+        }
+
+        // Por defecto, usar la dirección de Calle 34 No 38-47 Barzal
+        return 'https://maps.app.goo.gl/MZqCxVoKAgwrnUVh7';
+    }
+
+    /**
+     * Formatea la dirección con su URL de Google Maps
+     */
+    private function formatAddressWithMaps(string $address): string
+    {
+        if (empty($address)) {
+            $defaultAddress = 'Calle 34 No 38-47 Barzal';
+            $mapsUrl = 'https://maps.app.goo.gl/MZqCxVoKAgwrnUVh7';
+            return "*Dirección:* " . $defaultAddress . "\n📍 [Ver en Google Maps](" . $mapsUrl . ")";
+        }
+
+        $mapsUrl = $this->getGoogleMapsUrl($address);
+        return "*Dirección:* " . $address . "\n📍 [Ver en Google Maps](" . $mapsUrl . ")";
     }
 }

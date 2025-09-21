@@ -14,16 +14,16 @@ use Core\BoundedContext\AppointmentManagement\Infrastructure\Jobs\CreateAppointm
 use Core\BoundedContext\AppointmentManagement\Infrastructure\Jobs\ConfirmAppointmentJob;
 use Core\BoundedContext\AppointmentManagement\Infrastructure\Jobs\CancelAppointmentJob;
 use Core\BoundedContext\AppointmentManagement\Infrastructure\Jobs\IndexAppointmentsJob;
-use Illuminate\Support\Facades\Bus;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
-use Illuminate\Support\Facades\Log;
+use Core\Shared\Infrastructure\Http\Traits\DispatchesJobsSafely;
 
 final class AsyncAppointmentController extends Controller
 {
+    use DispatchesJobsSafely;
+
     public function __construct(
         private ListAppointmentsHandler $listAppointmentsHandler,
         private GetAppointmentHandler $getAppointmentHandler,
@@ -42,14 +42,11 @@ final class AsyncAppointmentController extends Controller
             $resumeKey
         );
 
-        // Retraso temporal para desarrollo
-        if (app()->environment('local', 'development')) {
-            $delaySeconds = (int) env('JOB_DELAY_SECONDS', 5);
-            $job->delay(now()->addSeconds($delaySeconds));
-            Bus::dispatch($job);
-        } else {
-            Bus::dispatch($job);
-        }
+        $this->dispatchSafely(
+            $job,
+            '----INDEXAR CITAS',
+            $request->all()
+        );
 
         return response()->json(['status' => 'queued', 'resume_key' => $resumeKey], 202);
     }
@@ -73,7 +70,6 @@ final class AsyncAppointmentController extends Controller
 
         $selectedSlot = $slots[$selectionIndex];
 
-        // Mapear el array de procedures al formato esperado de cups [code, cantidad]
         $cups = array_map(function ($procedure) {
             return [
                 'code' => $procedure['cups'],
@@ -97,14 +93,11 @@ final class AsyncAppointmentController extends Controller
         $job = new CreateAppointmentJob($jobData, $resumeKey);
         $job->onQueue('notifications');
 
-        $delayInSeconds = app()->environment('production') ? (int)env('JOB_PROD_DELAY_SECONDS', 2) : (int)env('JOB_DEV_DELAY_SECONDS', 5);
-        if ($delayInSeconds > 0) {
-            $job->delay(now()->addSeconds($delayInSeconds));
-        }
-        Log::info('----CREAR CITA Job despachado con ' . $delayInSeconds . ' segundos de retraso', [
-            'data' => $jobData
-        ]);
-        Bus::dispatch($job);
+        $this->dispatchSafely(
+            $job,
+            '----CREAR CITA',
+            $jobData
+        );
 
         return response()->json([
             'status' => 'queued',
@@ -117,17 +110,11 @@ final class AsyncAppointmentController extends Controller
         $resumeKey = Str::uuid()->toString();
         $job = new ConfirmAppointmentJob($request->all(), $centerKey, $id, $resumeKey);
         $job->onQueue('notifications');
-
-        // Retraso temporal para desarrollo
-        $delayInSeconds = app()->environment('production') ? (int)env('JOB_PROD_DELAY_SECONDS', 2) : (int)env('JOB_DEV_DELAY_SECONDS', 5);
-        if ($delayInSeconds > 0) {
-            $job->delay(now()->addSeconds($delayInSeconds));
-        }
-        Log::info('----CONFIRMAR CITA Job despachado con ' . $delayInSeconds . ' segundos de retraso', [
-            'data' => $request->all()
-        ]);
-
-        Bus::dispatch($job);
+        $this->dispatchSafely(
+            $job,
+            '----CONFIRMAR CITA',
+            $request->all()
+        );
 
         return response()->json(['status' => 'queued', 'resume_key' => $resumeKey], 202);
     }
@@ -138,14 +125,11 @@ final class AsyncAppointmentController extends Controller
         $job = new CancelAppointmentJob($request->all(), $centerKey, $id, $resumeKey);
         $job->onQueue('notifications');
 
-        $delayInSeconds = app()->environment('production') ? (int)env('JOB_PROD_DELAY_SECONDS', 2) : (int)env('JOB_DEV_DELAY_SECONDS', 5);
-        if ($delayInSeconds > 0) {
-            $job->delay(now()->addSeconds($delayInSeconds));
-        }
-        Log::info('----CANCELAR CITA Job despachado con ' . $delayInSeconds . ' segundos de retraso', [
-            'data' => $request->all()
-        ]);
-        Bus::dispatch($job);
+        $this->dispatchSafely(
+            $job,
+            '----CANCELAR CITA',
+            $request->all()
+        );
 
         return response()->json(['status' => 'queued', 'resume_key' => $resumeKey], 202);
     }

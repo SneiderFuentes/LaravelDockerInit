@@ -4,6 +4,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Core\BoundedContext\CommunicationManagement\Infrastructure\Controllers\Api\MessageController;
 use Core\BoundedContext\CommunicationManagement\Infrastructure\Controllers\Api\CallController;
+use Core\Shared\Infrastructure\Http\Controllers\HealthCheckController;
 
 /*
 |--------------------------------------------------------------------------
@@ -16,16 +17,11 @@ use Core\BoundedContext\CommunicationManagement\Infrastructure\Controllers\Api\C
 |
 */
 
+// Health check endpoint
+Route::get('/health', HealthCheckController::class);
+
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
-});
-
-// Health check endpoint
-Route::get('/health', function () {
-    return response()->json([
-        'status' => 'ok',
-        'timestamp' => now()->toIso8601String(),
-    ]);
 });
 
 // Rutas para comunicación

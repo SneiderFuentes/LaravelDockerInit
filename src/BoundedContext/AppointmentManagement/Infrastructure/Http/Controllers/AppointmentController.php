@@ -30,6 +30,8 @@ use Core\BoundedContext\AppointmentManagement\Domain\Repositories\EntityReposito
 use Core\BoundedContext\AppointmentManagement\Domain\Repositories\SoatRepositoryInterface;
 use Core\BoundedContext\AppointmentManagement\Domain\Repositories\ScheduleConfigRepositoryInterface;
 use Core\BoundedContext\AppointmentManagement\Infrastructure\Persistence\GenericDbAppointmentRepository;
+use Core\BoundedContext\AppointmentManagement\Application\DTOs\AppointmentDTO;
+use Carbon\Carbon;
 
 final class AppointmentController extends Controller
 {
@@ -131,9 +133,13 @@ final class AppointmentController extends Controller
 
             $appointment = $this->confirmAppointmentHandler->handle($command);
 
+            // Formatear mensaje de la cita
+            $formattedMessage = $this->formatSingleAppointmentMessage($appointment);
+
             return new JsonResponse([
                 'data' => $appointment->toArray(),
                 'message' => 'Appointment confirmed successfully',
+                'formatted_message' => $formattedMessage,
             ]);
         } catch (AppointmentNotFoundException $e) {
             return new JsonResponse([
@@ -168,9 +174,14 @@ final class AppointmentController extends Controller
 
             $appointment = $this->cancelAppointmentHandler->handle($command);
 
+            // Mensaje simple para cancelación
+            $formattedMessage = "✅ *Cita cancelada exitosamente*\n\n";
+            $formattedMessage .= "Su cita ha sido cancelada correctamente. Lamentamos los inconvenientes y esperamos poder atenderle en otra ocasión.";
+
             return new JsonResponse([
                 'data' => $appointment->toArray(),
                 'message' => 'Appointment cancelled successfully',
+                'formatted_message' => $formattedMessage,
             ]);
         } catch (AppointmentNotFoundException $e) {
             return new JsonResponse([
@@ -185,5 +196,176 @@ final class AppointmentController extends Controller
                 'error' => 'Error cancelling appointment: ' . $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Formatea un mensaje detallado para una única cita
+     */
+    private function formatSingleAppointmentMessage(AppointmentDTO $appointment): string
+    {
+        $appointmentArray = $appointment->toArray();
+        $doctorData = $appointmentArray['doctor_data'] ?? [];
+        $cupData = $appointmentArray['cup_data'] ?? [];
+
+        $doctorName = $doctorData['full_name'] ?? 'Médico no asignado';
+
+        // Formateo de fecha
+        $formattedDate = 'Fecha no disponible';
+        if ($appointment->date) {
+            try {
+                $formattedDate = Carbon::parse($appointment->date)->locale('es')->isoFormat('dddd D [de] MMMM [de] YYYY');
+            } catch (\Exception $e) {
+                // Mantener el valor por defecto si hay error
+            }
+        }
+
+        $time = $this->formatTimeSlot($appointment->timeSlot);
+
+        // Mapeo de estado
+        $statusMap = [
+            'pending' => 'Pendiente de Confirmar',
+            'confirmed' => 'Confirmada',
+            'cancelled' => 'Cancelada',
+        ];
+        $formattedStatus = $statusMap[$appointment->status->value] ?? ucfirst($appointment->status->value);
+
+        $detail = "*Detalles de la Cita (ID: " . $appointment->id . "):*\n\n";
+        $detail .= "*Fecha:* " . $formattedDate . "\n";
+        $detail .= "*Hora:* " . $time . "\n";
+        $detail .= "*Médico:* " . $doctorName . "\n";
+        $detail .= "*Paciente:* " . $appointment->patientName . "\n";
+        $detail .= "*Teléfono:* " . $appointment->patientPhone . "\n";
+        $detail .= "*Estado:* " . $formattedStatus . "\n";
+
+        // Añadir información de confirmación si existe
+        if ($appointment->confirmationDate) {
+            $confirmationDate = Carbon::parse($appointment->confirmationDate)->locale('es')->isoFormat('dddd D [de] MMMM [de] YYYY [a las] HH:mm');
+            $channelType = $appointment->confirmationChannelType ? ucfirst($appointment->confirmationChannelType->value) : 'No especificado';
+            $detail .= "*Confirmada el:* " . $confirmationDate . "\n";
+            $detail .= "*Canal de confirmación:* " . $channelType . "\n";
+        }
+
+        // Añadir dirección si existe en los CUPs
+        $addressFound = false;
+        if (!empty($cupData)) {
+            foreach ($cupData as $cup) {
+                if (!empty($cup['address'])) {
+                    $detail .= $this->formatAddressWithMaps($cup['address']) . "\n";
+                    $addressFound = true;
+                    break;
+                }
+            }
+        }
+
+        // Si no se encontró dirección, usar la por defecto
+        if (!$addressFound) {
+            $detail .= $this->formatAddressWithMaps('') . "\n";
+        }
+
+        $detail .= "\n";
+
+        if (!empty($cupData)) {
+            $detail .= "*Procedimientos:*\n";
+            foreach ($cupData as $cup) {
+                $cupName = $cup['name'] ?? 'Procedimiento sin nombre';
+                $detail .= "• " . $cupName . "\n";
+            }
+            $detail .= "\n";
+
+            $preparationsText = "*Preparación:*\n";
+            $hasPreparations = false;
+            foreach ($cupData as $cup) {
+                if (!empty($cup['preparation'])) {
+                    $cupName = $cup['name'] ?? 'Procedimiento sin nombre';
+                    $preparation = $cup['preparation'];
+                    $preparationsText .= "• Para *'" . $cupName . "'*: " . $preparation;
+
+                    // Añadir video_url si existe, o usar video por defecto para pruebas
+                    if (!empty($cup['video_url'])) {
+                        $preparationsText .= "\n  📹 [Ver video](" . $cup['video_url'] . ")";
+                    } else {
+                        // Video temporal por defecto para pruebas
+                        $preparationsText .= "\n  📹 [Ver video de preparación](https://www.youtube.com/watch?v=dQw4w9WgXcQ)";
+                    }
+
+                    // Añadir audio_url si existe
+                    if (!empty($cup['audio_url'])) {
+                        $preparationsText .= "\n  🎵 [Audio](" . $cup['audio_url'] . ")";
+                    }
+
+                    $preparationsText .= "\n";
+                    $hasPreparations = true;
+                }
+            }
+
+            if ($hasPreparations) {
+                $detail .= $preparationsText;
+            } else {
+                $detail .= "*Preparación:*\nNinguna preparación requerida.\n";
+            }
+        } else {
+            $detail .= "*Procedimientos:*\nNo hay procedimientos asociados.\n";
+            $detail .= "*Preparación:*\nNinguna preparación requerida.\n";
+        }
+
+        return $detail;
+    }
+
+    /**
+     * Formatea el time slot a formato legible
+     */
+    private function formatTimeSlot(string $timeSlot): string
+    {
+        // Asumiendo formato YYYYMMDDHHMM
+        if (strlen($timeSlot) === 12) {
+            $hour = substr($timeSlot, 8, 2);
+            $minute = substr($timeSlot, 10, 2);
+            return $hour . ':' . $minute;
+        }
+        return $timeSlot;
+    }
+
+    /**
+     * Obtiene la URL de Google Maps para una dirección específica
+     */
+    private function getGoogleMapsUrl(string $address): string
+    {
+        $addressMaps = [
+            'Calle 35 # 36 26 Antiguo edificio Clinica Martha' => 'https://maps.app.goo.gl/yTzZymhe2Nba31Ff9',
+            'Calle 34 No 38-47 Barzal' => 'https://maps.app.goo.gl/MZqCxVoKAgwrnUVh7',
+        ];
+
+        // Buscar coincidencia exacta primero
+        if (isset($addressMaps[$address])) {
+            return $addressMaps[$address];
+        }
+
+        // Buscar coincidencia parcial para mayor flexibilidad
+        foreach ($addressMaps as $knownAddress => $url) {
+            if (strpos($address, 'Calle 35') !== false && strpos($knownAddress, 'Calle 35') !== false) {
+                return $url;
+            }
+            if (strpos($address, 'Calle 34') !== false && strpos($knownAddress, 'Calle 34') !== false) {
+                return $url;
+            }
+        }
+
+        // Por defecto, usar la dirección de Calle 34 No 38-47 Barzal
+        return 'https://maps.app.goo.gl/MZqCxVoKAgwrnUVh7';
+    }
+
+    /**
+     * Formatea la dirección con su URL de Google Maps
+     */
+    private function formatAddressWithMaps(string $address): string
+    {
+        if (empty($address)) {
+            $defaultAddress = 'Calle 34 No 38-47 Barzal';
+            $mapsUrl = 'https://maps.app.goo.gl/MZqCxVoKAgwrnUVh7';
+            return "*Dirección:* " . $defaultAddress . "\n📍 [Ver en Google Maps](" . $mapsUrl . ")";
+        }
+
+        $mapsUrl = $this->getGoogleMapsUrl($address);
+        return "*Dirección:* " . $address . "\n📍 [Ver en Google Maps](" . $mapsUrl . ")";
     }
 }

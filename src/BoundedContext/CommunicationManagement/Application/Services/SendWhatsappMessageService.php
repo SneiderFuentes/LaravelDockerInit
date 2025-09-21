@@ -9,6 +9,8 @@ use Core\BoundedContext\CommunicationManagement\Domain\ValueObjects\MessageStatu
 use Core\BoundedContext\CommunicationManagement\Domain\Entities\Message;
 use Core\BoundedContext\CommunicationManagement\Domain\Repositories\MessageRepositoryInterface;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use DateTime;
 
 class SendWhatsappMessageService
@@ -65,5 +67,77 @@ class SendWhatsappMessageService
         $this->messageRepository->update($message);
 
         return $messageId;
+    }
+
+    /**
+     * Envía un flujo de confirmación de cita a través de Bird
+     */
+    public function sendAppointmentConfirmationFlow(array $appointmentData): bool
+    {
+        try {
+            $url = env('BIRD_FLOW_CONFIRM_APPOINTMENT');
+            $apiKey = env('FLOW_APPOINMENT_WEBHOOK_API_KEY');
+
+            Log::info('BEFORE REQUEST - Bird flow configuration', [
+                'url' => $url ? 'configured' : 'missing',
+                'api_key' => $apiKey ? 'configured' : 'missing',
+                'appointment_data' => $appointmentData
+            ]);
+
+            if (!$url || !$apiKey) {
+                Log::error('Missing Bird flow configuration', [
+                    'url' => $url ? 'configured' : 'missing',
+                    'api_key' => $apiKey ? 'configured' : 'missing'
+                ]);
+                return false;
+            }
+
+            Log::info('SENDING REQUEST to Bird', [
+                'url' => $url,
+                'headers' => [
+                    'Authorization' => 'Bearer ' . substr($apiKey, 0, 10) . '...',
+                    'Content-Type' => 'application/json'
+                ],
+                'body' => $appointmentData
+            ]);
+
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $apiKey,
+                'Content-Type' => 'application/json'
+            ])->post($url, $appointmentData);
+
+            Log::info('AFTER REQUEST - Bird response received', [
+                'appointment_id' => $appointmentData['appointment_id'] ?? 'unknown',
+                'phone_sent' => $appointmentData['phone'] ?? 'unknown',
+                'response_status' => $response->status(),
+                'response_headers' => $response->headers(),
+                'response_body' => $response->body()
+            ]);
+
+            if ($response->successful()) {
+                Log::info('Bird flow sent successfully', [
+                    'appointment_id' => $appointmentData['appointment_id'] ?? 'unknown',
+                    'phone' => $appointmentData['phone'] ?? 'unknown',
+                    'response_status' => $response->status()
+                ]);
+                return true;
+            } else {
+                Log::error('Failed to send Bird flow', [
+                    'appointment_id' => $appointmentData['appointment_id'] ?? 'unknown',
+                    'phone' => $appointmentData['phone'] ?? 'unknown',
+                    'status_code' => $response->status(),
+                    'response_body' => $response->body()
+                ]);
+                return false;
+            }
+        } catch (\Exception $e) {
+            Log::error('Exception sending Bird flow', [
+                'appointment_id' => $appointmentData['appointment_id'] ?? 'unknown',
+                'phone' => $appointmentData['phone'] ?? 'unknown',
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return false;
+        }
     }
 }

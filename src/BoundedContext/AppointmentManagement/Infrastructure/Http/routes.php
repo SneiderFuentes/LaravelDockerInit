@@ -93,6 +93,9 @@ Route::prefix('api/centers/{centerKey}')->group(function () {
 
         Route::post('async-appointments/{id}/confirm', [AsyncAppointmentController::class, 'confirm']);
         Route::post('async-appointments/{id}/cancel', [AsyncAppointmentController::class, 'cancel']);
+
+        Route::post('appointments/{id}/confirm', [AppointmentController::class, 'confirm']);
+        Route::post('appointments/{id}/cancel', [AppointmentController::class, 'cancel']);
     });
 
 

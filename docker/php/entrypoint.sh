@@ -28,24 +28,53 @@ if [ ! -f /var/www/vendor/autoload.php ]; then
   composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction --ansi
 fi
 
-# 1) Generar APP_KEY si no existe
-if [ -f /var/www/.env ] && ! grep -q '^APP_KEY=' /var/www/.env; then
-  echo "=> Generando APP_KEY..."
-  php artisan key:generate --ansi --force
+# Configuración de base de datos (solo una vez, con bloqueo)
+LOCK_FILE="/var/www/storage/app/.setup_lock"
+SETUP_COMPLETE="/var/www/storage/app/.setup_complete"
+
+if [ ! -f "$SETUP_COMPLETE" ]; then
+  # Intentar obtener el bloqueo (solo un contenedor lo conseguirá)
+  if (set -C; echo $$ > "$LOCK_FILE") 2>/dev/null; then
+    echo "=> Este contenedor ejecutará la configuración inicial..."
+
+    # Generar APP_KEY si no existe
+    if [ -f /var/www/.env ] && ! grep -q '^APP_KEY=' /var/www/.env; then
+      echo "=> Generando APP_KEY..."
+      php artisan key:generate --ansi --force
+    fi
+
+    # Migraciones
+    echo "=> Ejecutando migraciones..."
+    php artisan migrate --force
+
+    # Seeders
+    echo "=> Ejecutando seeders..."
+    php artisan db:seed --force
+
+    # Cachear configuraciones
+    echo "=> Cacheando configuraciones..."
+    php artisan config:clear --ansi
+    php artisan route:clear --ansi
+    php artisan view:clear --ansi
+    php artisan cache:clear --ansi
+    php artisan config:cache
+    php artisan route:cache --ansi
+    php artisan view:cache --ansi
+
+    # Marcar como completado y liberar el bloqueo
+    touch "$SETUP_COMPLETE"
+    rm -f "$LOCK_FILE"
+
+    echo "=> Configuración inicial completada."
+  else
+    # Este contenedor no obtuvo el bloqueo, esperar a que termine el otro
+    echo "=> Otro contenedor está ejecutando la configuración, esperando..."
+    while [ -f "$LOCK_FILE" ] || [ ! -f "$SETUP_COMPLETE" ]; do
+      sleep 1
+    done
+    echo "=> Configuración completada por otro contenedor, continuando..."
+  fi
 fi
-
-# 2) Migraciones
-echo "=> Ejecutando migraciones principales..."
-php artisan migrate --force
-
-# echo "=> Ejecutando migraciones de centros..."
-# php artisan migrate --path=database/migrations/centers --realpath --force
-
-# 4) Cachear configuraciones, rutas y vistas
-php artisan config:clear --ansi
-php artisan route:clear --ansi
-php artisan route:cache --ansi
-php artisan view:cache --ansi
 
 # 5) Arrancar el comando que se pase (php-fpm o php artisan horizon)
 exec "$@"

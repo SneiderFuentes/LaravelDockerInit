@@ -43,15 +43,13 @@ class Kernel extends ConsoleKernel
 
         // Programar el envío de mensajes de WhatsApp diariamente a las 7:00
         $schedule->job(new SendWhatsappMessages())
-            ->dailyAt('7:00')
-            ->withoutOverlapping()
-            ->runInBackground();
+            ->dailyAt('11:00')
+            ->withoutOverlapping();
 
         // Programar llamadas para usuarios que no han confirmado a las 16:00
         $schedule->job(new CallUnconfirmedUsers())
             ->dailyAt('16:00')
-            ->withoutOverlapping()
-            ->runInBackground();
+            ->withoutOverlapping();
     }
 
     /**

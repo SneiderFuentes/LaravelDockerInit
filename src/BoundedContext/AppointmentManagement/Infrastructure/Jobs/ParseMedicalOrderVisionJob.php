@@ -63,13 +63,6 @@ class ParseMedicalOrderVisionJob implements ShouldQueue
                         'message' => 'El documento del paciente no coincide con el documento esperado. Por favor, asegúrate de que el archivo sea una orden médica legible y vuelve a intentarlo.'
                     ];
                 }
-                if (isset($data['orden']['fecha']) && $data['orden']['fecha'] < now()->subDays(120)->format('Y-m-d')) {
-                    Log::info('----LA FECHA DE LA ORDEN ES MÁS ANTIGUA DE 30 DÍAS', ['fecha' => $data['orden']['fecha'], 'now' => now()->format('Y-m-d')]);
-                    $payload = [
-                        'status' => 'error',
-                        'message' => 'La fecha de la orden es más antigua de 120 días. Por favor, asegúrate de que el archivo sea una orden médica legible y vuelve a intentarlo.'
-                    ];
-                }
                 $data['order_id'] = $this->orderId;
             }
             $notifier->notifyFromConfig($this->resumeKey, $payload, 'ParseMedicalOrderVisionJob - ');

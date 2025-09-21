@@ -9,12 +9,13 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Bus;
 use Illuminate\Validation\Rule;
-use Illuminate\Support\Facades\Log;
+use Core\Shared\Infrastructure\Http\Traits\DispatchesJobsSafely;
 
 class AsyncPlanAppointmentsController extends Controller
 {
+    use DispatchesJobsSafely;
+
     public function __invoke(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -29,21 +30,18 @@ class AsyncPlanAppointmentsController extends Controller
 
         $job = new PlanAppointmentsJob(
             $validated['orden'],
-            (string) $validated['patient_id'] ?? null,
+            (string) ($validated['patient_id'] ?? null),
             $validated['client_type'],
             $planId,
             $resumeKey
         );
         $job->onQueue('ai-logic');
 
-        $delayInSeconds = app()->environment('production') ? (int)env('JOB_PROD_DELAY_SECONDS', 2) : (int)env('JOB_DEV_DELAY_SECONDS', 5);
-        if ($delayInSeconds > 0) {
-            $job->delay(now()->addSeconds($delayInSeconds));
-        }
-        Log::info('----PLANIFICAR CITAS Job despachado con ' . $delayInSeconds . ' segundos de retraso', [
-            'data' => $validated
-        ]);
-        Bus::dispatch($job);
+        $this->dispatchSafely(
+            $job,
+            '----PLANIFICAR CITAS',
+            $validated
+        );
 
         return response()->json([
             'plan_id'   => $planId,

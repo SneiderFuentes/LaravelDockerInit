@@ -3,6 +3,7 @@ FROM php:8.3-fpm
 # 1) Sistema y extensiones PHP (incluyendo pcntl para Horizon)
 RUN apt-get update && apt-get install -y \
     git unzip zip libzip-dev libonig-dev libpng-dev \
+    netcat-openbsd \
     default-mysql-client \
     ghostscript \
     && pecl install redis \
