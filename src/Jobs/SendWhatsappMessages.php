@@ -18,6 +18,24 @@ class SendWhatsappMessages implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     /**
+     * The number of times the job may be attempted.
+     */
+    public $tries = 3;
+
+    /**
+     * Handle a job failure.
+     */
+    public function failed(\Throwable $exception): void
+    {
+        Log::error('SendWhatsappMessages job failed completely', [
+            'error' => $exception->getMessage(),
+            'file' => $exception->getFile(),
+            'line' => $exception->getLine(),
+            'trace' => $exception->getTraceAsString()
+        ]);
+    }
+
+    /**
      * Create a new job instance.
      *
      * @return void
@@ -40,10 +58,11 @@ class SendWhatsappMessages implements ShouldQueue
         SendWhatsappMessageService $whatsappService,
         SubaccountRepositoryInterface $subaccountRepository
     ): void {
-        Log::info('Starting to send WhatsApp messages');
+        try {
+            Log::info('Starting to send WhatsApp messages');
 
-        // Obtener la lista de subcuentas (centros)
-        $subaccounts = $subaccountRepository->findAll();
+            // Obtener la lista de subcuentas (centros)
+            $subaccounts = $subaccountRepository->findAll();
         Log::info('Found ' . count($subaccounts) . ' subaccounts to process');
 
         $totalAppointments = 0;
@@ -217,10 +236,20 @@ class SendWhatsappMessages implements ShouldQueue
             }
         }
 
-        Log::info('Finished sending WhatsApp messages', [
-            'total_appointments' => $totalAppointments,
-            'total_messages_sent' => $totalMessagesSent
-        ]);
+            Log::info('Finished sending WhatsApp messages', [
+                'total_appointments' => $totalAppointments,
+                'total_messages_sent' => $totalMessagesSent
+            ]);
+
+        } catch (\Throwable $e) {
+            Log::error('Critical error in SendWhatsappMessages job', [
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
+        }
     }
 
     /**

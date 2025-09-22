@@ -39,7 +39,7 @@ $app = Application::configure(basePath: dirname(__DIR__))
 
 $app->singleton(
     ConsoleKernelContract::class,
-    CoreConsoleKernel::class
+    CoreConsoleKernel::class,
 );
 
 return $app;
