@@ -71,6 +71,7 @@ class SendWhatsappMessages implements ShouldQueue
 
                 Log::info('Found ' . count($appointments) . ' appointments for center: ' . $subaccount->key());
                 $totalAppointments += count($appointments);
+                $skippedAppointments = 0;
 
                 foreach ($appointments as $appointment) {
                     try {
@@ -111,16 +112,23 @@ class SendWhatsappMessages implements ShouldQueue
                         $originalPhone = $appointment->patientPhone();
                         $parsedPhone = $this->parseColombianPhone($originalPhone);
 
-                        // Si no se puede parsear el número, usar el de test
-                        $finalPhone = '+573103343616';//$parsedPhone ?: '+573103343616';
-
+                        // Si no se puede parsear el número, saltar esta cita
                         if (!$parsedPhone) {
-                            Log::warning('Using test phone due to invalid patient phone', [
+                            $skippedAppointments++;
+                            Log::warning('MESSAGE NOT SENT - Invalid patient phone number', [
                                 'appointment_id' => $appointment->id(),
-                                'original_phone' => $originalPhone,
-                                'test_phone' => $finalPhone
+                                'patient_name' => $appointment->patientName(),
+                                'patient_phone_original' => $originalPhone,
+                                'appointment_date' => $appointmentDate,
+                                'appointment_time' => $appointmentTime,
+                                'clinic' => $subaccount->name(),
+                                'reason' => 'Unable to parse Colombian mobile number',
+                                'status' => 'SKIPPED'
                             ]);
+                            continue; // Saltar a la siguiente cita
                         }
+
+                        $finalPhone = $parsedPhone;
 
                         // Preparar datos para el flujo de Bird
                         $appointmentData = [
@@ -150,25 +158,58 @@ class SendWhatsappMessages implements ShouldQueue
 
                         if ($success) {
                             $totalMessagesSent++;
-                            Log::info('Sent Bird appointment confirmation flow', [
+                            Log::info('MESSAGE SENT SUCCESSFULLY - Bird appointment confirmation flow', [
                                 'appointment_id' => $appointment->id(),
-                                'phone' => $finalPhone,
-                                'original_phone' => $originalPhone,
-                                'parsed_phone' => $parsedPhone,
-                                'center' => $subaccount->key()
+                                'patient_name' => $appointment->patientName(),
+                                'patient_phone_original' => $originalPhone,
+                                'patient_phone_final' => $finalPhone,
+                                'appointment_date' => $appointmentDate,
+                                'appointment_time' => $appointmentTime,
+                                'clinic' => $subaccount->name(),
+                                'procedures' => $proceduresText,
+                                'status' => 'SENT_SUCCESS'
+                            ]);
+                        } else {
+                            Log::error('MESSAGE FAILED TO SEND - Bird appointment confirmation flow', [
+                                'appointment_id' => $appointment->id(),
+                                'patient_name' => $appointment->patientName(),
+                                'patient_phone_original' => $originalPhone,
+                                'patient_phone_final' => $finalPhone,
+                                'appointment_date' => $appointmentDate,
+                                'appointment_time' => $appointmentTime,
+                                'clinic' => $subaccount->name(),
+                                'procedures' => $proceduresText,
+                                'status' => 'SENT_FAILED',
+                                'reason' => 'Bird API returned false'
                             ]);
                         }
 
                         // Solo procesar una cita por centro para pruebas
-                        break;
+                        // break;
                     } catch (\Exception $e) {
-                        Log::error('Failed to send Bird appointment confirmation flow', [
+                        Log::error('MESSAGE EXCEPTION - Failed to send Bird appointment confirmation flow', [
                             'appointment_id' => $appointment->id(),
-                            'error' => $e->getMessage(),
-                            'center' => $subaccount->key()
+                            'patient_name' => $appointment->patientName(),
+                            'patient_phone_original' => $originalPhone ?? 'N/A',
+                            'appointment_date' => $appointmentDate ?? 'N/A',
+                            'appointment_time' => $appointmentTime ?? 'N/A',
+                            'clinic' => $subaccount->name(),
+                            'status' => 'EXCEPTION_ERROR',
+                            'error_message' => $e->getMessage(),
+                            'error_file' => $e->getFile(),
+                            'error_line' => $e->getLine()
                         ]);
                     }
                 }
+
+                // Log de resumen para este centro
+                Log::info('Center processing summary', [
+                    'center' => $subaccount->key(),
+                    'total_appointments' => count($appointments),
+                    'skipped_appointments' => $skippedAppointments,
+                    'processed_appointments' => count($appointments) - $skippedAppointments
+                ]);
+
             } catch (\Exception $e) {
                 Log::error('Failed to process center: ' . $subaccount->key(), [
                     'error' => $e->getMessage()
