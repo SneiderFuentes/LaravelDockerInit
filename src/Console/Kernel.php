@@ -22,6 +22,7 @@ class Kernel extends ConsoleKernel
         SeedSubaccountsCommand::class,
         DispatchJob::class,
         \Core\Console\HealthCheckCommand::class,
+        \App\Console\Commands\RunWhatsappJob::class,
     ];
 
     /**
