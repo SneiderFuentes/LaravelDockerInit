@@ -69,7 +69,7 @@ services:
             MYSQL_PASSWORD: apppass
             TZ: America/Bogota
         ports:
-            - "3307:3306"
+            - "13307:3306"
         volumes:
             - dbdata:/var/lib/mysql
             - ./docker/mysql/init:/docker-entrypoint-initdb.d
@@ -100,7 +100,7 @@ services:
         container_name: appointments_nginx
         restart: unless-stopped
         ports:
-            - "80:80"
+            - "9080:80"
         volumes:
             - ./:/var/www
             - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
@@ -154,7 +154,7 @@ services:
             - "nginx:80" # <host interno>:<puerto>
             - "--log=stdout" # para ver la URL con docker logs
         ports:
-            - "4040:4040"
+            - "14040:4040"
         networks:
             - appnet
         logging:
