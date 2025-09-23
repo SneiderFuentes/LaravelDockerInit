@@ -39,7 +39,7 @@ class SendWhatsappMessage implements ShouldQueue
     {
         Log::error('SendWhatsappMessage job failed', [
             'center_key' => $this->centerKey,
-            'appointment_id' => $this->appointmentData['appointment_id'] ?? 'N/A',
+            'patient_id' => $this->appointmentData['patient_id'] ?? 'N/A',
             'patient_name' => $this->appointmentData['patient_name'] ?? 'N/A',
             'patient_phone' => $this->appointmentData['phone'] ?? 'N/A',
             'error' => $exception->getMessage(),
@@ -53,56 +53,13 @@ class SendWhatsappMessage implements ShouldQueue
      */
     public function handle(SendWhatsappMessageService $whatsappService): void
     {
-        try {
-            Log::info('Starting WhatsApp message job', [
-                'center_key' => $this->centerKey,
-                'appointment_id' => $this->appointmentData['appointment_id'],
-                'patient_name' => $this->appointmentData['patient_name'],
-                'patient_phone' => $this->appointmentData['phone']
-            ]);
-
             // Enviar flujo de confirmación de cita por WhatsApp
             $success = $whatsappService->sendAppointmentConfirmationFlow($this->appointmentData);
 
-            if ($success) {
-                Log::info('WHATSAPP MESSAGE SENT SUCCESSFULLY', [
-                    'appointment_id' => $this->appointmentData['appointment_id'],
-                    'patient_name' => $this->appointmentData['patient_name'],
-                    'patient_phone' => $this->appointmentData['phone'],
-                    'appointment_date' => $this->appointmentData['appointment_date'],
-                    'appointment_time' => $this->appointmentData['appointment_time'],
-                    'clinic' => $this->appointmentData['clinic_name'],
-                    'procedures' => $this->appointmentData['procedures'],
-                    'center_key' => $this->centerKey,
-                    'status' => 'WHATSAPP_SENT_SUCCESS'
-                ]);
-            } else {
-                Log::error('WHATSAPP MESSAGE FAILED TO SEND', [
-                    'appointment_id' => $this->appointmentData['appointment_id'],
-                    'patient_name' => $this->appointmentData['patient_name'],
-                    'patient_phone' => $this->appointmentData['phone'],
-                    'appointment_date' => $this->appointmentData['appointment_date'],
-                    'appointment_time' => $this->appointmentData['appointment_time'],
-                    'clinic' => $this->appointmentData['clinic_name'],
-                    'procedures' => $this->appointmentData['procedures'],
-                    'center_key' => $this->centerKey,
-                    'status' => 'WHATSAPP_SENT_FAILED',
-                    'reason' => 'Bird WhatsApp API returned false'
-                ]);
-            }
-
-        } catch (\Throwable $e) {
-            Log::error('Critical error in SendWhatsappMessage job', [
-                'center_key' => $this->centerKey,
-                'appointment_id' => $this->appointmentData['appointment_id'] ?? 'N/A',
-                'patient_name' => $this->appointmentData['patient_name'] ?? 'N/A',
-                'patient_phone' => $this->appointmentData['phone'] ?? 'N/A',
-                'error' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'trace' => $e->getTraceAsString()
+            // Log final con información esencial
+            Log::info('WHATSAPP_MESSAGE_RESULT', [
+                'status' => $success ? 'SENT_SUCCESS' : 'SENT_FAILED',
+                'appointment_data' => $this->appointmentData
             ]);
-            throw $e;
-        }
     }
 }

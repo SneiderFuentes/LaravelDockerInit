@@ -678,4 +678,34 @@ final class GenericDbAppointmentRepository extends BaseRepository implements App
 
         return $count > 0;
     }
+
+    public function findUniquePatientDocumentsInDateRange(
+        string $centerKey,
+        DateTime $startDate,
+        DateTime $endDate
+    ): array {
+        $config = $this->getConfig($centerKey);
+        $connection = DB::connection($config->connection());
+
+        $appointmentsTable = $config->tableName('appointments');
+        $appointmentsMapping = $config->mapping('appointments');
+
+        // Consulta optimizada para obtener solo cédulas únicas de pacientes con citas en el rango
+        $results = $connection->table($appointmentsTable)
+            ->select("{$appointmentsTable}.{$appointmentsMapping['patient_id']}")
+            ->where("{$appointmentsTable}.{$appointmentsMapping['date']}", '>=', $startDate->format('Y-m-d'))
+            ->where("{$appointmentsTable}.{$appointmentsMapping['date']}", '<=', $endDate->format('Y-m-d'))
+            ->where("{$appointmentsTable}.{$appointmentsMapping['canceled']}", 0) // Solo citas activas
+            ->groupBy("{$appointmentsTable}.{$appointmentsMapping['patient_id']}")
+            ->pluck($appointmentsMapping['patient_id']);
+
+        Log::info('Unique patient documents query completed', [
+            'center_key' => $centerKey,
+            'start_date' => $startDate->format('Y-m-d H:i:s'),
+            'end_date' => $endDate->format('Y-m-d H:i:s'),
+            'unique_patient_ids_found' => count($results)
+        ]);
+
+        return $results->toArray();
+    }
 }

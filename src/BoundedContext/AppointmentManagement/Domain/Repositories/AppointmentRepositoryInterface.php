@@ -112,4 +112,18 @@ interface AppointmentRepositoryInterface
      * Inserta un registro en la tabla pxcita
      */
     public function createPxcita(array $data): void;
+
+    /**
+     * Find unique patient documents (cedulas) that have appointments in a given date range
+     *
+     * @param string $centerKey
+     * @param DateTime $startDate
+     * @param DateTime $endDate
+     * @return array Array of unique patient documents with appointment data
+     */
+    public function findUniquePatientDocumentsInDateRange(
+        string $centerKey,
+        DateTime $startDate,
+        DateTime $endDate
+    ): array;
 }

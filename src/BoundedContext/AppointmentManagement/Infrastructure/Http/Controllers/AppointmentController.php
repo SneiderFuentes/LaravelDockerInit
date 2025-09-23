@@ -283,9 +283,6 @@ final class AppointmentController extends Controller
                     // Añadir video_url si existe, o usar video por defecto para pruebas
                     if (!empty($cup['video_url'])) {
                         $preparationsText .= "\n  📹 [Ver video](" . $cup['video_url'] . ")";
-                    } else {
-                        // Video temporal por defecto para pruebas
-                        $preparationsText .= "\n  📹 [Ver video de preparación](https://www.youtube.com/watch?v=dQw4w9WgXcQ)";
                     }
 
                     // Añadir audio_url si existe

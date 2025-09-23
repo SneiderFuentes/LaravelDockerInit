@@ -184,7 +184,7 @@ services:
         command:
             - "http" # sub-comando
             - "nginx:80" # <host interno>:<puerto>
-            - "--hostname=app.colibrixa.com"
+            - "--hostname=${NGROK_HOSTNAME:-app.colibrixa.com}"
             - "--log=stdout" # para ver la URL con docker logs
         ports:
             - "14040:4040"
