@@ -26,7 +26,7 @@ class SendWhatsappMessagesHourly implements ShouldQueue
     /**
      * The maximum number of seconds the job can run.
      */
-    public $timeout = 180; // 3 minutos para consultas con JOINs completos
+    public $timeout = 180;// 3 minutos para consultas con JOINs completos
 
     /**
      * Create a new job instance.
@@ -163,34 +163,23 @@ class SendWhatsappMessagesHourly implements ShouldQueue
                         'procedures' => $proceduresText
                     ];
 
-                    // Enviar flujo de confirmación de cita
-                    $success = $whatsappService->sendAppointmentConfirmationFlow($appointmentData);
+                    // Despachar job para enviar mensaje de WhatsApp
+                    try {
+                        \Core\Jobs\SendWhatsappMessage::dispatch($appointmentData, $this->centerKey)
+                            ->delay(now()->addSeconds(2)); // Delay de 2 segundos para evitar saturación
 
-                    if ($success) {
                         $messagesSent++;
-                        Log::info('MESSAGE SENT SUCCESSFULLY - Bird appointment confirmation flow', [
+                        Log::info('WhatsApp message job dispatched', [
                             'appointment_id' => $appointment->id(),
                             'patient_name' => $appointment->patientName(),
-                            'patient_phone_original' => $originalPhone,
-                            'patient_phone_final' => $parsedPhone,
-                            'appointment_date' => $appointmentDate,
-                            'appointment_time' => $appointmentTime,
-                            'clinic' => $subaccount->name(),
-                            'procedures' => $proceduresText,
-                            'status' => 'SENT_SUCCESS'
+                            'patient_phone' => $parsedPhone,
+                            'center_key' => $this->centerKey
                         ]);
-                    } else {
-                        Log::error('MESSAGE FAILED TO SEND - Bird appointment confirmation flow', [
+                    } catch (\Exception $whatsappException) {
+                        Log::error('Failed to dispatch WhatsApp message job', [
                             'appointment_id' => $appointment->id(),
                             'patient_name' => $appointment->patientName(),
-                            'patient_phone_original' => $originalPhone,
-                            'patient_phone_final' => $parsedPhone,
-                            'appointment_date' => $appointmentDate,
-                            'appointment_time' => $appointmentTime,
-                            'clinic' => $subaccount->name(),
-                            'procedures' => $proceduresText,
-                            'status' => 'SENT_FAILED',
-                            'reason' => 'Bird API returned false'
+                            'error' => $whatsappException->getMessage()
                         ]);
                     }
 
