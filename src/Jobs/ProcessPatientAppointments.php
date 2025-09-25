@@ -85,6 +85,9 @@ class ProcessPatientAppointments implements ShouldQueue
             return;
         }
 
+        // Extraer y formatear procedimientos
+        $proceduresList = $this->extractProceduresList($appointments);
+
         // Preparar datos consolidados para el mensaje
         $consolidatedData = [
             'appointment_id' => $appointments[0]['id'],
@@ -94,9 +97,12 @@ class ProcessPatientAppointments implements ShouldQueue
             'appointment_date' => $this->appointmentDate,
             'appointment_time' => $appointments[0]['time_slot'],
             'clinic_name' => 'Neuro Electro Diagnostico del llano',
-            'procedures' => $appointments,
+            'procedures' => $proceduresList,
             'total_appointments' => count($appointments),
         ];
+        Log::info('Consolidated data', [
+            'consolidated_data' => $consolidatedData
+        ]);
 
         // Despachar job para enviar mensaje de WhatsApp consolidado
         \Core\Jobs\SendWhatsappMessage::dispatch($consolidatedData, $this->centerKey)
@@ -147,5 +153,40 @@ class ProcessPatientAppointments implements ShouldQueue
         ]);
 
         return null;
+    }
+
+    /**
+     * Extrae y formatea la lista de procedimientos de las citas como texto
+     */
+    private function extractProceduresList(array $appointments): string
+    {
+        $procedures = [];
+
+        foreach ($appointments as $appointment) {
+            if (isset($appointment['cup_data']) && is_array($appointment['cup_data'])) {
+                foreach ($appointment['cup_data'] as $cup) {
+                    if (isset($cup['name']) && !empty($cup['name'])) {
+                        $procedures[] = trim($cup['name']);
+                    }
+                }
+            }
+        }
+
+        // Eliminar duplicados
+        $uniqueProcedures = array_unique($procedures);
+
+        // Formatear como texto numerado
+        if (empty($uniqueProcedures)) {
+            return "No hay procedimientos asignados";
+        }
+
+        $proceduresList = "*Procedimientos a realizar:* ";
+        foreach ($uniqueProcedures as $index => $procedure) {
+            $proceduresList .= ($index + 1) . ". " . $procedure . " • ";
+        }
+        // Remover el último separador
+        $proceduresList = rtrim($proceduresList, " • ");
+
+        return trim($proceduresList);
     }
 }

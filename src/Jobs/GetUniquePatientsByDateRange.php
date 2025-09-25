@@ -69,20 +69,13 @@ class GetUniquePatientsByDateRange implements ShouldQueue
             $appointmentDate = $this->startTime->format('Y-m-d'); // Usar la fecha de inicio
 
             foreach ($uniquePatientIds as $patientId) {
-                    Log::info('ProcessPatientAppointments job dispatched', [
-                        'patient_id' => $patientId,
-                        'center_key' => $this->centerKey,
-                        'appointment_date' => $appointmentDate,
-                        'job_number' => $jobsDispatched
-                    ]);
                     \Core\Jobs\ProcessPatientAppointments::dispatch(
                         $patientId,
                         $this->centerKey,
                         $appointmentDate,
                     )->delay(now()->addSeconds($jobsDispatched * 2));
                 // Espaciar jobs 2 segundos
-
-                    $jobsDispatched++;
+                $jobsDispatched++;
             }
 
             // Log final con información esencial

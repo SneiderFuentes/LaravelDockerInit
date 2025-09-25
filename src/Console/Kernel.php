@@ -42,9 +42,9 @@ class Kernel extends ConsoleKernel
         $schedule->command('health-check:run')
             ->everyFiveMinutes();
 
-        // Programar el envío de mensajes de WhatsApp diariamente a las 7:00
-        $schedule->job(new SendWhatsappMessages())
-            ->dailyAt('11:00')
+        // Programar el envío de mensajes de WhatsApp diariamente a las 11:00
+        $schedule->command('whatsapp:send-messages')
+            ->dailyAt('10:00')
             ->withoutOverlapping();
 
         // Programar llamadas para usuarios que no han confirmado a las 16:00

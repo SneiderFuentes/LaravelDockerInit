@@ -116,9 +116,6 @@ class GetUpcomingAppointmentsByPatientJob implements ShouldQueue
                                 // Añadir video_url si existe, o usar video por defecto para pruebas
                                 if (!empty($cup['video_url'])) {
                                     $preparationsText .= "\n  📹 [Ver video](" . $cup['video_url'] . ")";
-                                } else {
-                                    // Video temporal por defecto para pruebas
-                                    $preparationsText .= "\n  📹 [Ver video de preparación](https://www.youtube.com/watch?v=dQw4w9WgXcQ)";
                                 }
                                 $preparationsText .= "\n";
                                 $hasPreparations = true;
@@ -166,7 +163,7 @@ class GetUpcomingAppointmentsByPatientJob implements ShouldQueue
     private function getGoogleMapsUrl(string $address): string
     {
         $addressMaps = [
-            'Calle 35 # 36 26 Antiguo edificio Clinica Martha' => 'https://maps.app.goo.gl/yTzZymhe2Nba31Ff9',
+            'Calle 35 # 36 26 Antiguo edificio Clinica Martha' => 'https://maps.app.goo.gl/eVNp9t7wY8DhgUhR6',
             'Calle 34 No 38-47 Barzal' => 'https://maps.app.goo.gl/MZqCxVoKAgwrnUVh7',
         ];
 

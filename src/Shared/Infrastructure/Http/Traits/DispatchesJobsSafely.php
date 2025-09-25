@@ -21,7 +21,7 @@ trait DispatchesJobsSafely
     protected function dispatchSafely(object $job, string $logMessage, array $logContext = []): void
     {
         // 1. Aplicar la lógica de retraso
-        $delayInSeconds = app()->environment('production') ? (int)env('JOB_PROD_DELAY_SECONDS', 2) : (int)env('JOB_DEV_DELAY_SECONDS', 5);
+        $delayInSeconds = app()->environment('production') ? (int)env('JOB_PROD_DELAY_SECONDS', 5) : (int)env('JOB_DEV_DELAY_SECONDS', 10);
         if ($delayInSeconds > 0) {
             $job->delay(now()->addSeconds($delayInSeconds));
         }

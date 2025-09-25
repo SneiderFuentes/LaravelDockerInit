@@ -32,6 +32,8 @@ use Core\BoundedContext\AppointmentManagement\Domain\Repositories\ScheduleConfig
 use Core\BoundedContext\AppointmentManagement\Infrastructure\Persistence\GenericDbAppointmentRepository;
 use Core\BoundedContext\AppointmentManagement\Application\DTOs\AppointmentDTO;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 final class AppointmentController extends Controller
 {
@@ -142,14 +144,32 @@ final class AppointmentController extends Controller
                 'formatted_message' => $formattedMessage,
             ]);
         } catch (AppointmentNotFoundException $e) {
+            Log::error("Appointment not found in confirm()", [
+                'appointment_id' => $id,
+                'center_key' => $centerKey,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             return new JsonResponse([
                 'error' => $e->getMessage(),
             ], 404);
         } catch (InvalidArgumentException $e) {
+            Log::error("Invalid argument in confirm()", [
+                'appointment_id' => $id,
+                'center_key' => $centerKey,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             return new JsonResponse([
                 'error' => $e->getMessage(),
             ], 400);
         } catch (\Throwable $e) {
+            Log::error("Unexpected error in confirm()", [
+                'appointment_id' => $id,
+                'center_key' => $centerKey,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             return new JsonResponse([
                 'error' => 'Error confirming appointment: ' . $e->getMessage(),
             ], 500);
@@ -184,14 +204,32 @@ final class AppointmentController extends Controller
                 'formatted_message' => $formattedMessage,
             ]);
         } catch (AppointmentNotFoundException $e) {
+            Log::error("Appointment not found in cancel()", [
+                'appointment_id' => $id,
+                'center_key' => $centerKey,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             return new JsonResponse([
                 'error' => $e->getMessage(),
             ], 404);
         } catch (InvalidArgumentException $e) {
+            Log::error("Invalid argument in cancel()", [
+                'appointment_id' => $id,
+                'center_key' => $centerKey,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             return new JsonResponse([
                 'error' => $e->getMessage(),
             ], 400);
         } catch (\Throwable $e) {
+            Log::error("Unexpected error in cancel()", [
+                'appointment_id' => $id,
+                'center_key' => $centerKey,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             return new JsonResponse([
                 'error' => 'Error cancelling appointment: ' . $e->getMessage(),
             ], 500);
@@ -328,7 +366,7 @@ final class AppointmentController extends Controller
     private function getGoogleMapsUrl(string $address): string
     {
         $addressMaps = [
-            'Calle 35 # 36 26 Antiguo edificio Clinica Martha' => 'https://maps.app.goo.gl/yTzZymhe2Nba31Ff9',
+            'Calle 35 # 36 26 Antiguo edificio Clinica Martha' => 'https://maps.app.goo.gl/eVNp9t7wY8DhgUhR6',
             'Calle 34 No 38-47 Barzal' => 'https://maps.app.goo.gl/MZqCxVoKAgwrnUVh7',
         ];
 
@@ -365,4 +403,5 @@ final class AppointmentController extends Controller
         $mapsUrl = $this->getGoogleMapsUrl($address);
         return "*Dirección:* " . $address . "\n📍 [Ver en Google Maps](" . $mapsUrl . ")";
     }
+
 }

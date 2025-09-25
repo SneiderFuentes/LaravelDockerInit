@@ -38,8 +38,13 @@ class ScheduleRepository extends BaseRepository implements ScheduleRepositoryInt
             ->where($mapping['id'], $scheduleId);
 
         if ($type !== null) {
-            if ($type === 'procedimiento' || $type === 'nocturno') {
-                $query->where($mapping['name'], 'like', '%' . $type . '%');
+            if ($type === 'procedimiento' || $type === 'nocturno' || $type === 'sedacion') {
+                $query->whereRaw($mapping['name'] . ' COLLATE utf8_general_ci LIKE ?', ['%' . $type . '%']);
+            } else {
+                // Buscar agendas que NO contengan procedimiento, nocturno, sedacion
+                $query->whereRaw($mapping['name'] . ' COLLATE utf8_general_ci NOT LIKE ?', ['%procedimiento%'])
+                      ->whereRaw($mapping['name'] . ' COLLATE utf8_general_ci NOT LIKE ?', ['%nocturno%'])
+                      ->whereRaw($mapping['name'] . ' COLLATE utf8_general_ci NOT LIKE ?', ['%sedacion%']);
             }
         }
 
