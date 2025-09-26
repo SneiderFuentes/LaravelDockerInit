@@ -62,8 +62,8 @@ class SendWhatsappMessages implements ShouldQueue
         //$endDate = now()->addDay()->endOfDay(); // Mañana hasta las 23:59
 
         // Fechas específicas: 2 y 3 de octubre de 2025
-         $startDate = Carbon::create(2025, 10, 21)->startOfDay(); // 2 de octubre desde las 00:00
-         $endDate = Carbon::create(2025, 10, 21)->endOfDay(); // 3 de octubre hasta las 23:59
+         $startDate = Carbon::create(2025, 10, 30)->startOfDay(); // 2 de octubre desde las 00:00
+         $endDate = Carbon::create(2025, 10, 30)->endOfDay(); // 3 de octubre hasta las 23:59
 
         // Ejecutar directamente el job que consulta IDs de pacientes únicos
         \Core\Jobs\GetUniquePatientsByDateRange::dispatch(
