@@ -57,7 +57,7 @@ class ParseMedicalOrderVisionJob implements ShouldQueue
                     'summary_text' => $summaryText,
                     'message' => 'Medical order parsed successfully'
                 ];
-                if (isset($data['paciente']['documento']) && $data['paciente']['documento'] !== $this->patientDocument) {
+                if (isset($data['paciente']['documento']) && $data['paciente']['documento'] !== $this->patientDocument && $data['paciente']['entidad'] !== 'Capital Salud') {
                     $payload = [
                         'status' => 'error',
                         'message' => 'El documento del paciente no coincide con el documento esperado. Por favor, asegúrate de que el archivo sea una orden médica legible y vuelve a intentarlo.'
@@ -145,8 +145,10 @@ class ParseMedicalOrderVisionJob implements ShouldQueue
 
         $text = "Resumen de tu orden médica\n\n";
         $text .= "*Paciente*\n";
-        $text .= "Nombre: {$nombre}\n";
-        $text .= "Documento: {$documento}\n";
+        if ($entidad !== 'Capital Salud') {
+            $text .= "Nombre: {$nombre}\n";
+            $text .= "Documento: {$documento}\n";
+        }
         $text .= "Edad / Sexo: {$edad} años · {$sexo}\n";
         $text .= "Entidad: {$entidad}\n\n";
 

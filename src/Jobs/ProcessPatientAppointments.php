@@ -94,7 +94,7 @@ class ProcessPatientAppointments implements ShouldQueue
             'phone' => $parsedPhone,
             'patient_id' => $this->patientId,
             'patient_name' => $patientName,
-            'appointment_date' => $this->appointmentDate,
+            'appointment_date' => $appointments[0]['date'],
             'appointment_time' => $appointments[0]['time_slot'],
             'clinic_name' => 'Neuro Electro Diagnostico del llano',
             'procedures' => $proceduresList,
