@@ -29,7 +29,8 @@ interface AppointmentRepositoryInterface
         DateTime $date,
         string $timeSlot,
         string $entity,
-        int $agendaId
+        int $agendaId,
+        bool $is_contrasted
     ): Appointment;
 
     /**
@@ -126,4 +127,26 @@ interface AppointmentRepositoryInterface
         DateTime $startDate,
         DateTime $endDate
     ): array;
+
+    /**
+     * Find appointments by date range and entity
+     *
+     * @param string $centerKey
+     * @param DateTime $startDate
+     * @param DateTime $endDate
+     * @param string $entity
+     * @return array
+     */
+    public function findByDateAndEntity(
+        string $centerKey,
+        DateTime $startDate,
+        DateTime $endDate,
+        string $entity
+    ): array;
+
+    public function sumQuantitiesByAppointmentIdsAndCups(
+        array $appointmentIds,
+        array $cupCodes,
+        string $centerKey
+    ): int;
 }

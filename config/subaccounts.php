@@ -79,6 +79,8 @@ return [
                         'confirmation_date' => 'FechaConfirmacion',
                         'confirmation_channel' => 'MedioConfirmacion',
                         'confirmation_channel_id' => 'IdMedioConfirmacion',
+                        'fulfilled' => 'Cumplida',
+                        'observations' => 'Observaciones',
                     ],
                 ],
                 'schedules' => [

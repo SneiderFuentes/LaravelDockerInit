@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Core\BoundedContext\AppointmentManagement\Infrastructure\Jobs;
 
 use Core\BoundedContext\AppointmentManagement\Application\Services\AppointmentGrouperAIService;
+use Core\BoundedContext\AppointmentManagement\Application\Services\CupsGroupFilterService;
 use Core\BoundedContext\AppointmentManagement\Domain\Repositories\CupProcedureRepositoryInterface;
 use Core\BoundedContext\AppointmentManagement\Domain\Repositories\EntityRepositoryInterface;
 use Core\BoundedContext\AppointmentManagement\Domain\Repositories\PatientRepositoryInterface;
@@ -41,11 +42,12 @@ class PlanAppointmentsJob implements ShouldQueue
         SoatRepositoryInterface $soatRepo,
         AppointmentGrouperAIService $grouper,
         WebhookNotifierService $notifier,
-        AppointmentRepositoryInterface $appointmentRepo
+        AppointmentRepositoryInterface $appointmentRepo,
+        CupsGroupFilterService $cupsFilterService
     ): void {
         Log::info('----PLANEAR CITAS Job en ejecución', ['attempts' => $this->attempts()]);
         try {
-            $enrichResult = $this->enrichProcedures($patientRepo, $entityRepo, $cupRepo, $soatRepo, $appointmentRepo);
+            $enrichResult = $this->enrichProcedures($patientRepo, $entityRepo, $cupRepo, $soatRepo, $appointmentRepo, $cupsFilterService);
             $enrichedProcedures = $enrichResult['enriched'];
             $rejectedProcedures = $enrichResult['rejected'];
             $alreadyScheduledProcedures = $enrichResult['already_scheduled'];
@@ -56,15 +58,7 @@ class PlanAppointmentsJob implements ShouldQueue
                 $serviceName = $proc['service_name'] ?? 'default';
                 $proceduresByServiceName[$serviceName][] = $proc;
             }
-            Log::info('Procedures enrichment result', [
-                'plan_id' => $this->planId,
-                'enriched_procedures' => $enrichedProcedures,
-                'rejected_procedures' => $rejectedProcedures,
-                'already_scheduled_procedures' => $alreadyScheduledProcedures,
-                'procedures_by_service_name' => $proceduresByServiceName,
-                'enriched_count' => count($enrichedProcedures),
-                'rejected_count' => count($rejectedProcedures)
-            ]);
+
             $allGroupedAppointments = [];
 
             // 2. Iterar sobre cada grupo de especialidad y llamar a la IA
@@ -76,15 +70,6 @@ class PlanAppointmentsJob implements ShouldQueue
                 if ($servicePrompt) {
                     $prompt .= "\n\n" . $servicePrompt;
                 }
-
-                Log::info(
-                    'Sending request to AI for appointment grouping',
-                    [
-                        'service_name' => $serviceName,
-                        'procedures_count' => count($procedures),
-                        'prompt' => $prompt
-                    ]
-                );
 
                 $response = $grouper->group($procedures, $prompt);
 
@@ -153,7 +138,8 @@ class PlanAppointmentsJob implements ShouldQueue
         EntityRepositoryInterface $entityRepo,
         CupProcedureRepositoryInterface $cupRepo,
         SoatRepositoryInterface $soatRepo,
-        AppointmentRepositoryInterface $appointmentRepo
+        AppointmentRepositoryInterface $appointmentRepo,
+        CupsGroupFilterService $cupsFilterService
     ): array {
         // Determine entity and price type
         $entityCode = null;
@@ -172,12 +158,54 @@ class PlanAppointmentsJob implements ShouldQueue
 
         $individualEntity = $entityRepo->findByCode('PAR01');
         $individualPriceType = $individualEntity['price_type'];
-
+        $isSan2 = $entity['code'] === 'SAN02';
         $enriched = [];
         $rejected = [];
         $alreadyScheduled = [];
+
+        $cupsGroups = config('cups_groups.groups', []);
+
+        // Verificar si hay algún CUP que pertenezca a un grupo configurado
+        $hasGroupCups = false;
+        if ($isSan2) {
+            foreach ($this->data['procedimientos'] as $proc) {
+                $cupCode = $proc['cups'];
+                if ($this->findGroupByCup($cupCode, $cupsGroups)) {
+                    $hasGroupCups = true;
+                    break;
+                }
+            }
+        }
+
+        // Solo obtener IDs de citas si hay CUPS que pertenecen a grupos
+        $appointmentIds = [];
+        if ($isSan2 && $hasGroupCups) {
+            $appointmentIds = $cupsFilterService->filterAppointmentsByCupsGroup('datosipsndx');
+        }
+
         foreach ($this->data['procedimientos'] as $proc) {
             $cupCode = $proc['cups'];
+            if ($isSan2 && $hasGroupCups) {
+                $groupInfo = $this->findGroupByCup($cupCode, $cupsGroups);
+                if ($groupInfo) {
+                    $groupCups = $groupInfo['cups'];
+                    $maxLimit = $groupInfo['max'];
+                    $groupName = $groupInfo['group_name'];
+
+                    // Obtener total de cantidades para este grupo específico
+                    $groupTotal = $cupsFilterService->getTotalQuantitiesForGroupCups($appointmentIds, $groupCups, 'datosipsndx');
+                    $groupTotal['is_at_limit'] = $groupTotal['total_quantity'] >= $maxLimit;
+
+                    if ($groupTotal && $groupTotal['is_at_limit']) {
+                        $rejected[] = [
+                            'cups' => $cupCode,
+                            'descripcion' => $proc['descripcion'],
+                            'reason' => "No se puede asignar cita, intenta de nuevo en una semana."
+                        ];
+                        continue;
+                    }
+                }
+            }
 
             if ($this->patientId && $appointmentRepo->hasFutureAppointmentsForCup($this->patientId, $cupCode)) {
                 $alreadyScheduled[] = [
@@ -231,5 +259,27 @@ class PlanAppointmentsJob implements ShouldQueue
         }
 
         return ['enriched' => $enriched, 'rejected' => $rejected, 'already_scheduled' => $alreadyScheduled];
+    }
+
+    /**
+     * Encuentra el grupo al que pertenece un CUP y retorna su información
+     */
+    private function findGroupByCup(string $cupCode, array $groups): ?array
+    {
+        foreach ($groups as $groupName => $group) {
+            if (in_array($cupCode, $group['cups'])) {
+                return [
+                    'group_name' => $groupName,
+                    'cups' => $group['cups'],
+                    'max' => $group['max'],
+                    'min' => $group['min'],
+                    'ref' => $group['ref'],
+                    'tarifa' => $group['tarifa'],
+                    'valor_mes' => $group['valor_mes']
+                ];
+            }
+        }
+
+        return null;
     }
 }

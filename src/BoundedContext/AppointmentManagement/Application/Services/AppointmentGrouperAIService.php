@@ -34,8 +34,6 @@ final class AppointmentGrouperAIService
             ],
         ];
 
-        Log::info('Sending request to AI for appointment grouping', ['messages' => $messages]);
-
         $response = OpenAI::chat()->create([
             'model'    => 'gpt-4o-mini',
             'messages' => $messages,

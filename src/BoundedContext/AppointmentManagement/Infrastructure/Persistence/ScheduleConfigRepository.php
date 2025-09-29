@@ -34,11 +34,11 @@ class ScheduleConfigRepository extends BaseRepository implements ScheduleConfigR
         return $row ? ArrayMapper::mapToLogicalFields($row, $mapping) : null;
     }
 
-    public function getAppointmentDuration($agendaId): int
+    public function getAppointmentDuration($agendaId, ?string $doctorDocument = null): int
     {
         $config = $this->getConfig();
         $mapping = $config->tables()['schedule_configs']['mapping'];
-        $row = $this->findByScheduleId($agendaId);
+        $row = $this->findByScheduleId($agendaId, $doctorDocument);
         if ($row && isset($row['appointment_duration'])) {
             return (int)$row['appointment_duration'];
         }

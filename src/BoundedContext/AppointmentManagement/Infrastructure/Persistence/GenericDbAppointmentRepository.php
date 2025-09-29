@@ -73,6 +73,7 @@ final class GenericDbAppointmentRepository extends BaseRepository implements App
                 "{$appointmentTable}.{$mapping['doctor_id']} as doctor_document",
                 "{$appointmentTable}.{$mapping['confirmed']} as confirmed",
                 "{$appointmentTable}.{$mapping['canceled']} as canceled",
+                "{$appointmentTable}.{$mapping['fulfilled']} as fulfilled",
                 "{$appointmentTable}.{$mapping['entity']} as entity",
                 "{$appointmentTable}.{$mapping['confirmation_date']} as confirmation_date",
                 "{$appointmentTable}.{$mapping['cancel_date']} as cancel_date",
@@ -153,7 +154,8 @@ final class GenericDbAppointmentRepository extends BaseRepository implements App
         string $timeSlot,
         string $entity,
         int $agendaId,
-        ?int $cupId = null
+        bool $is_contrasted = false,
+        ?int $cupId = null,
     ): Appointment {
         $config = $this->getConfig(self::CENTER_KEY);
         $connection = DB::connection($config->connection());
@@ -179,7 +181,8 @@ final class GenericDbAppointmentRepository extends BaseRepository implements App
             $mapping['user_request_date'] => $appointmentDate->format('Y-m-d'),
             $mapping['canceled'] => 0,
             $mapping['confirmed'] => 0,
-            $mapping['created_by'] => 0
+            $mapping['created_by'] => 0,
+            $mapping['observations'] => $is_contrasted ? 'Contrastada' : null
         ];
 
         if ($cupId !== null) {
@@ -210,6 +213,7 @@ final class GenericDbAppointmentRepository extends BaseRepository implements App
                 "{$appointmentTable}.{$mapping['doctor_id']} as doctor_document",
                 "{$appointmentTable}.{$mapping['confirmed']} as confirmed",
                 "{$appointmentTable}.{$mapping['canceled']} as canceled",
+                "{$appointmentTable}.{$mapping['fulfilled']} as fulfilled",
                 "{$appointmentTable}.{$mapping['entity']} as entity",
                 "{$appointmentTable}.{$mapping['confirmation_date']} as confirmation_date",
                 "{$appointmentTable}.{$mapping['cancel_date']} as cancel_date",
@@ -313,6 +317,7 @@ final class GenericDbAppointmentRepository extends BaseRepository implements App
                 "{$appointmentTable}.{$mapping['doctor_id']} as doctor_id",
                 "{$appointmentTable}.{$mapping['confirmed']} as confirmed",
                 "{$appointmentTable}.{$mapping['canceled']} as canceled",
+                "{$appointmentTable}.{$mapping['fulfilled']} as fulfilled",
                 "{$appointmentTable}.{$mapping['entity']} as entity",
                 "{$appointmentTable}.{$mapping['confirmation_date']} as confirmation_date",
                 "{$appointmentTable}.{$mapping['cancel_date']} as cancel_date",
@@ -531,6 +536,24 @@ final class GenericDbAppointmentRepository extends BaseRepository implements App
         $connection->table($pxcitaTable)->insert($insertData);
     }
 
+    /**
+     * Suma las cantidades de pxcita para IDs de citas y CUPS específicos
+     */
+    public function sumQuantitiesByAppointmentIdsAndCups(array $appointmentIds, array $cupCodes, string $centerKey): int
+    {
+        $config = $this->getConfig($centerKey);
+        $connection = DB::connection($config->connection());
+        $pxcitaTable = $config->tables()['pxcita']['table'];
+        $pxcitaMapping = $config->tables()['pxcita']['mapping'];
+
+        $totalQuantity = $connection->table($pxcitaTable)
+            ->whereIn("{$pxcitaMapping['appointment_id']}", $appointmentIds)
+            ->whereIn("{$pxcitaMapping['cup_code']}", $cupCodes)
+            ->sum("{$pxcitaMapping['quantity']}");
+
+        return (int) $totalQuantity;
+    }
+
     public function findByAgendaAndDate(int|string $agendaId, string $date): array
     {
         $config = $this->getConfig(self::CENTER_KEY);
@@ -565,6 +588,7 @@ final class GenericDbAppointmentRepository extends BaseRepository implements App
                 "{$appointmentTable}.{$mapping['doctor_id']} as doctor_document",
                 "{$appointmentTable}.{$mapping['confirmed']} as confirmed",
                 "{$appointmentTable}.{$mapping['canceled']} as canceled",
+                "{$appointmentTable}.{$mapping['fulfilled']} as fulfilled",
                 "{$appointmentTable}.{$mapping['entity']} as entity",
                 "{$appointmentTable}.{$mapping['confirmation_date']} as confirmation_date",
                 "{$appointmentTable}.{$mapping['cancel_date']} as cancel_date",
@@ -705,6 +729,63 @@ final class GenericDbAppointmentRepository extends BaseRepository implements App
             'end_date' => $endDate->format('Y-m-d H:i:s'),
             'unique_patient_ids_found' => count($results)
         ]);
+
+        return $results->toArray();
+    }
+
+    /**
+     * Encuentra IDs de citas por fecha y entidad (optimizado)
+     */
+    public function findByDateAndEntity(string $centerKey, DateTime $startDate, DateTime $endDate, string $entity): array
+    {
+        $config = $this->getConfig($centerKey);
+        $connection = DB::connection($config->connection());
+
+        $mapping = $config->mapping('appointments');
+        $appointmentTable = $config->tableName('appointments');
+
+        $now = now();
+        $currentDateTime = $now->format('Y-m-d H:i:s');
+        $currentTimeSlot = $now->format('YmdHi'); // Formato: 202409281310
+
+        // Asegurar que usamos el mes actual completo
+        $startOfMonth = clone $startDate;
+        $startOfMonth->modify('first day of this month')->setTime(0, 0, 0);
+        $endOfMonth = clone $endDate;
+        $endOfMonth->modify('last day of this month')->setTime(23, 59, 59);
+
+        Log::info('Filtrando citas por fecha y entidad con lógica de cumplidas', [
+            'center_key' => $centerKey,
+            'entity' => $entity,
+            'start_date' => $startOfMonth->format('Y-m-d'),
+            'end_date' => $endOfMonth->format('Y-m-d'),
+            'current_datetime' => $currentDateTime,
+            'current_time_slot' => $currentTimeSlot
+        ]);
+
+        $results = $connection->table($appointmentTable)
+            ->select([
+                "{$appointmentTable}.{$mapping['id']}",
+                "{$appointmentTable}.{$mapping['date']}",
+                "{$appointmentTable}.{$mapping['time_slot']}"
+            ])
+            ->where("{$appointmentTable}.{$mapping['entity']}", $entity)
+            ->where("{$appointmentTable}.{$mapping['canceled']}", 0)
+            ->whereBetween(
+                "{$appointmentTable}.{$mapping['date']}",
+                [$startOfMonth->format('Y-m-d'), $endOfMonth->format('Y-m-d')]
+            )
+            ->where(function($query) use ($appointmentTable, $mapping, $currentTimeSlot) {
+                $query->where(function($subQuery) use ($appointmentTable, $mapping, $currentTimeSlot) {
+                    // Citas PASADAS: deben estar cumplidas
+                    $subQuery->whereRaw("CAST({$appointmentTable}.{$mapping['time_slot']} AS UNSIGNED) < ?", [$currentTimeSlot])
+                             ->where("{$appointmentTable}.{$mapping['fulfilled']}", -1);
+                })->orWhere(function($subQuery) use ($appointmentTable, $mapping, $currentTimeSlot) {
+                    // Citas FUTURAS: solo no canceladas (sin filtro de cumplidas)
+                    $subQuery->whereRaw("CAST({$appointmentTable}.{$mapping['time_slot']} AS UNSIGNED) >= ?", [$currentTimeSlot]);
+                });
+            })
+            ->pluck($mapping['id']);
 
         return $results->toArray();
     }

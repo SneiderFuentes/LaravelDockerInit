@@ -21,8 +21,6 @@ final class VisionMedicalOrderService
         // 1. Obtener el prompt base desde la configuración
         $visionPrompt = config('ai.vision_prompt');
 
-        Log::info('----VISION PROMPT', ['api_key' => config('openai.api_key')]);
-
         // 2. Obtener la lista de CUPS y formatearla para el prompt
         $allCups = $this->cupRepository->findAll();
         $cupsContext = "A continuación, una lista de CUPS y descripciones de referencia. Úsala para corregir posibles errores de OCR en el código del procedimiento basándote en la descripción del texto:\n\n";
@@ -77,8 +75,6 @@ final class VisionMedicalOrderService
 
         try {
 
-            Log::info('----PROMPT CONTEXT', ['prompt' => $promptWithContext]);
-
             $response = OpenAI::chat()->create([
                 'model'    => 'gpt-4o-mini',
                 'response_format' => ['type' => 'json_object'],
@@ -106,7 +102,6 @@ final class VisionMedicalOrderService
                 'max_tokens'   => 1200,
                 'temperature'  => 0,
             ]);
-            Log::info('----RESPONSE', ['response' => $response]);
 
             $content = $response->choices[0]->message->content ?? '';
             $data = [];
@@ -156,7 +151,6 @@ final class VisionMedicalOrderService
                 ]);
                 throw new \Exception('AI response has an invalid structure: ' . $validator->errors()->first());
             }
-            Log::info('----DATA', ['data' => $data]);
 
             return $data;
         } finally {

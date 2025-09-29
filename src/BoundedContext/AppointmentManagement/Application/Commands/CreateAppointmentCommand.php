@@ -15,6 +15,7 @@ final class CreateAppointmentCommand
         public readonly string $date,
         public readonly string $time,
         public readonly array $cups,
-        public readonly int $espacios = 1
+        public readonly int $espacios = 1,
+        public readonly bool $is_contrasted = false
     ) {}
 }

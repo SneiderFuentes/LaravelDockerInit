@@ -59,7 +59,7 @@ final class CreateAppointmentHandler
         }
 
         $currentAppointmentTime = new DateTime($command->time);
-        $duracionCita = $this->scheduleConfigRepository->getAppointmentDuration($command->agendaId);
+        $duracionCita = $this->scheduleConfigRepository->getAppointmentDuration($command->agendaId, $command->doctorId);
         $createdAppointments = [];
 
         for ($i = 0; $i < $command->espacios; $i++) {
@@ -85,7 +85,8 @@ final class CreateAppointmentHandler
                 $appointmentDate,
                 $formattedTimeSlot,
                 $mainEntityCode,
-                $command->agendaId
+                $command->agendaId,
+                $command->is_contrasted
             );
 
             if ($i === 0) {

@@ -65,6 +65,7 @@ class ParseMedicalOrderVisionJob implements ShouldQueue
                 }
                 $data['order_id'] = $this->orderId;
             }
+
             $notifier->notifyFromConfig($this->resumeKey, $payload, 'ParseMedicalOrderVisionJob - ');
         } catch (\Throwable $e) {
             if ($this->attempts() >= $this->tries) {
