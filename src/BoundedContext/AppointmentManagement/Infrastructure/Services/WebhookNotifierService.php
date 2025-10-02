@@ -52,8 +52,18 @@ class WebhookNotifierService
 
     public function notifyFromConfig(string $resumeKey, array $payload, string $logPrefix = ''): void
     {
-        $webhookUrl = config('services.messagebird.webhooks.appointment_flow_webhook');
+        $webhookUrls = config('services.messagebird.webhooks.appointment_flow_webhook');
         $birdKey = config('services.messagebird.api_key');
-        $this->notify($webhookUrl, $birdKey, $resumeKey, $payload, $logPrefix);
+
+        $urls = is_string($webhookUrls) ? array_map('trim', explode(',', $webhookUrls)) : [$webhookUrls];
+
+        foreach ($urls as $index => $webhookUrl) {
+            if (empty($webhookUrl)) {
+                continue;
+            }
+
+            $currentLogPrefix = $logPrefix . "[Webhook " . ($index + 1) . "/" . count($urls) . "] ";
+            $this->notify($webhookUrl, $birdKey, $resumeKey, $payload, $currentLogPrefix);
+        }
     }
 }

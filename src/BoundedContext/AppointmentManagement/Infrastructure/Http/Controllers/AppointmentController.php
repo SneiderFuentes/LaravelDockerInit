@@ -137,6 +137,7 @@ final class AppointmentController extends Controller
 
             // Formatear mensaje de la cita
             $formattedMessage = $this->formatSingleAppointmentMessage($appointment);
+            Log::info('formattedMessage', ['formattedMessage' => $formattedMessage]);
 
             return new JsonResponse([
                 'data' => $appointment->toArray(),
