@@ -615,6 +615,55 @@ final class GenericDbAppointmentRepository extends BaseRepository implements App
         return $results->map(fn($row) => $this->mapToDomainWithDetails($row, $config))->toArray();
     }
 
+    /**
+     * Obtiene citas PENDIENTES de un paciente para una fecha específica
+     * (no canceladas y no confirmadas)
+     */
+    public function findPendingAppointmentsByPatientAndDate(int|string $patientId, string $date): array
+    {
+        $config = $this->getConfig(self::CENTER_KEY);
+        $connection = DB::connection($config->connection());
+        $mapping = $config->mapping('appointments');
+        $patientMapping = $config->mapping('patients');
+        $appointmentTable = $config->tableName('appointments');
+        $patientTable = $config->tableName('patients');
+
+        $results = $connection->table($appointmentTable)
+            ->select([
+                "{$appointmentTable}.{$mapping['id']} as id",
+                "{$appointmentTable}.{$mapping['date']} as date",
+                "{$appointmentTable}.{$mapping['time_slot']} as time_slot",
+                "{$appointmentTable}.{$mapping['doctor_id']} as doctor_document",
+                "{$appointmentTable}.{$mapping['confirmed']} as confirmed",
+                "{$appointmentTable}.{$mapping['canceled']} as canceled",
+                "{$appointmentTable}.{$mapping['fulfilled']} as fulfilled",
+                "{$appointmentTable}.{$mapping['entity']} as entity",
+                "{$appointmentTable}.{$mapping['confirmation_date']} as confirmation_date",
+                "{$appointmentTable}.{$mapping['cancel_date']} as cancel_date",
+                "{$appointmentTable}.{$mapping['confirmation_channel']} as confirmation_channel",
+                "{$appointmentTable}.{$mapping['confirmation_channel_id']} as confirmation_channel_id",
+                "{$appointmentTable}.{$mapping['agenda_id']} as agenda_id",
+                "{$patientTable}.{$patientMapping['id']} as patient_id",
+                "{$patientTable}.{$patientMapping['full_name']} as patient_name",
+                "{$patientTable}.{$patientMapping['phone']} as patient_phone",
+            ])
+            ->join(
+                $patientTable,
+                "{$appointmentTable}.{$mapping['patient_id']}",
+                '=',
+                "{$patientTable}.{$patientMapping['id']}"
+            )
+            ->where("{$appointmentTable}.{$mapping['patient_id']}", $patientId)
+            ->where("{$appointmentTable}.{$mapping['canceled']}", 0) // No canceladas
+            ->where("{$appointmentTable}.{$mapping['confirmed']}", 0) // No confirmadas
+            ->where("{$appointmentTable}.{$mapping['date']}", '>=', $date)
+            ->orderBy("{$appointmentTable}.{$mapping['date']}")
+            ->orderBy("{$appointmentTable}.{$mapping['time_slot']}")
+            ->get();
+
+        return $results->map(fn($row) => $this->mapToDomainWithDetails($row, $config))->toArray();
+    }
+
     public function findConsecutiveAppointments(Appointment $mainAppointment, array $candidateAppointments): array
     {
         $consecutiveBlock = [];
@@ -728,6 +777,41 @@ final class GenericDbAppointmentRepository extends BaseRepository implements App
             'start_date' => $startDate->format('Y-m-d H:i:s'),
             'end_date' => $endDate->format('Y-m-d H:i:s'),
             'unique_patient_ids_found' => count($results)
+        ]);
+
+        return $results->toArray();
+    }
+
+    /**
+     * Obtiene IDs únicos de pacientes con citas PENDIENTES en el rango de fechas
+     * (no canceladas y no confirmadas)
+     */
+    public function findUniquePendingPatientDocumentsInDateRange(
+        string $centerKey,
+        DateTime $startDate,
+        DateTime $endDate
+    ): array {
+        $config = $this->getConfig($centerKey);
+        $connection = DB::connection($config->connection());
+
+        $appointmentsTable = $config->tableName('appointments');
+        $appointmentsMapping = $config->mapping('appointments');
+
+        // Consulta optimizada para obtener solo cédulas únicas de pacientes con citas PENDIENTES
+        $results = $connection->table($appointmentsTable)
+            ->select("{$appointmentsTable}.{$appointmentsMapping['patient_id']}")
+            ->where("{$appointmentsTable}.{$appointmentsMapping['date']}", '>=', $startDate->format('Y-m-d'))
+            ->where("{$appointmentsTable}.{$appointmentsMapping['date']}", '<=', $endDate->format('Y-m-d'))
+            ->where("{$appointmentsTable}.{$appointmentsMapping['canceled']}", 0) // No canceladas
+            ->where("{$appointmentsTable}.{$appointmentsMapping['confirmed']}", 0) // No confirmadas
+            ->groupBy("{$appointmentsTable}.{$appointmentsMapping['patient_id']}")
+            ->pluck($appointmentsMapping['patient_id']);
+
+        Log::info('Unique pending patient documents query completed', [
+            'center_key' => $centerKey,
+            'start_date' => $startDate->format('Y-m-d H:i:s'),
+            'end_date' => $endDate->format('Y-m-d H:i:s'),
+            'unique_pending_patient_ids_found' => count($results)
         ]);
 
         return $results->toArray();

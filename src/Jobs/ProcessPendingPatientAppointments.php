@@ -2,7 +2,7 @@
 
 namespace Core\Jobs;
 
-use Core\BoundedContext\AppointmentManagement\Application\Handlers\GetUpcomingAppointmentsByPatientHandler;
+use Core\BoundedContext\AppointmentManagement\Application\Handlers\GetPendingAppointmentsByPatientHandler;
 use Core\BoundedContext\SubaccountManagement\Domain\Entities\Subaccount;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -12,7 +12,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
-class ProcessPatientAppointments implements ShouldQueue
+class ProcessPendingPatientAppointments implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -40,7 +40,7 @@ class ProcessPatientAppointments implements ShouldQueue
      */
     public function failed(\Throwable $exception): void
     {
-        Log::error('ProcessPatientAppointments job failed completely', [
+        Log::error('ProcessPendingPatientAppointments job failed completely', [
             'patient_id' => $this->patientId,
             'center_key' => $this->centerKey,
             'appointment_date' => $this->appointmentDate,
@@ -54,24 +54,24 @@ class ProcessPatientAppointments implements ShouldQueue
     /**
      * Execute the job.
      */
-    public function handle(GetUpcomingAppointmentsByPatientHandler $handler): void
+    public function handle(GetPendingAppointmentsByPatientHandler $handler): void
     {
-            // Obtener las citas del paciente usando el handler
+            // Obtener las citas PENDIENTES del paciente usando el handler
             $appointments = $handler->handle($this->patientId, $this->appointmentDate);
 
             if (empty($appointments)) {
                 return;
             }
 
-            // Procesar las citas del paciente
-            $this->processPatientAppointments($appointments);
+            // Procesar las citas PENDIENTES del paciente
+            $this->processPendingPatientAppointments($appointments);
 
     }
 
     /**
-     * Procesar las citas del paciente y enviar mensaje consolidado
+     * Procesar las citas PENDIENTES del paciente y realizar llamada automática
      */
-    private function processPatientAppointments(array $appointments): void
+    private function processPendingPatientAppointments(array $appointments): void
     {
         // Obtener datos del primer paciente (todos deberían ser del mismo paciente)
         $firstAppointment = $appointments[0];
@@ -91,8 +91,9 @@ class ProcessPatientAppointments implements ShouldQueue
         // Extraer dirección del primer procedimiento
         $clinicAddress = $this->extractClinicAddress($appointments);
 
-        // Preparar datos consolidados para el mensaje
+        // Preparar datos consolidados para el mensaje PENDIENTE
         $consolidatedData = [
+            'from' => '+576082795066',
             'appointment_id' => $appointments[0]['id'],
             'phone' => $parsedPhone,
             'patient_id' => $this->patientId,
@@ -103,14 +104,15 @@ class ProcessPatientAppointments implements ShouldQueue
             'clinic_address' => $clinicAddress,
             'procedures' => $proceduresList,
             'total_appointments' => count($appointments),
+            'appointment_status' => 'PENDING',
         ];
-        Log::info('Consolidated data', [
+        Log::info('Consolidated pending data', [
             'consolidated_data' => $consolidatedData
         ]);
 
-        // Despachar job para enviar mensaje de WhatsApp consolidado
-        \Core\Jobs\SendWhatsappMessage::dispatch($consolidatedData, $this->centerKey)
-            ->delay(now()->addSeconds(2));
+        // Despachar job para realizar llamada automática para citas PENDIENTES
+        \Core\Jobs\MakePendingAppointmentCall::dispatch($consolidatedData, $this->centerKey)
+            ->delay(now()->addSeconds(5));
     }
 
     /**
@@ -178,6 +180,7 @@ class ProcessPatientAppointments implements ShouldQueue
 
         // Eliminar duplicados
         $uniqueProcedures = array_unique($procedures);
+        Log::info('uniqueProcedures', ['uniqueProcedures' => $uniqueProcedures]);
 
         // Formatear como texto numerado
         if (empty($uniqueProcedures)) {

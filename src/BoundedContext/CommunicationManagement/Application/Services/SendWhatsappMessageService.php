@@ -103,4 +103,39 @@ class SendWhatsappMessageService
                 return false;
             }
     }
+
+    /**
+     * Envía un flujo de recordatorio de cita PENDIENTE a través de Bird
+     */
+    public function sendPendingAppointmentReminderFlow(array $appointmentData): bool
+    {
+            $url = env('BIRD_FLOW_PENDING_APPOINTMENT');
+            $apiKey = env('FLOW_APPOINMENT_WEBHOOK_API_KEY');
+
+            if (!$url || !$apiKey) {
+                Log::error('Missing Bird flow configuration for pending appointments', [
+                    'url' => $url ? 'configured' : 'missing',
+                    'api_key' => $apiKey ? 'configured' : 'missing'
+                ]);
+                return false;
+            }
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $apiKey,
+                'Content-Type' => 'application/json'
+            ])->post($url, $appointmentData);
+
+            Log::info('AFTER REQUEST - Bird pending response received', [
+                'appointment_id' => $appointmentData['appointment_id'] ?? 'unknown',
+                'patient_name' => $appointmentData['patient_name'] ?? 'unknown',
+                'phone_sent' => $appointmentData['phone'] ?? 'unknown',
+                'response_status' => $response->status(),
+                'response_headers' => $response->headers(),
+                'response_body' => $response->body()
+            ]);
+            if ($response->successful()) {
+                return true;
+            } else {
+                return false;
+            }
+    }
 }

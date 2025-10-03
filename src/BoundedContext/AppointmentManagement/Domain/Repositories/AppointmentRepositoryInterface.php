@@ -87,6 +87,24 @@ interface AppointmentRepositoryInterface
     public function findByPatientAndDate(int|string $patientId, string $date): array;
 
     /**
+     * Obtiene IDs únicos de pacientes con citas PENDIENTES en el rango de fechas
+     * (no canceladas y no confirmadas)
+     * @return array
+     */
+    public function findUniquePendingPatientDocumentsInDateRange(
+        string $centerKey,
+        DateTime $startDate,
+        DateTime $endDate
+    ): array;
+
+    /**
+     * Obtiene citas PENDIENTES de un paciente para una fecha específica
+     * (no canceladas y no confirmadas)
+     * @return array
+     */
+    public function findPendingAppointmentsByPatientAndDate(int|string $patientId, string $date): array;
+
+    /**
      * Encuentra un bloque de citas consecutivas a partir de una cita principal y una lista de candidatas.
      *
      * @param Appointment $mainAppointment La cita de referencia.

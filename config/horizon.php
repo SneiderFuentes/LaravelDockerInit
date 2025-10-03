@@ -224,6 +224,15 @@ return [
                 'timeout' => 240,      // 4 mins, > al timeout del job más largo (180s)
                 'memory' => 128,
             ],
+            'appointment-updates-supervisor' => [
+                'connection' => 'redis',
+                'queue' => ['default'],
+                'balance' => 'simple', // Procesos fijos para evitar concurrencia
+                'processes' => 1,      // SOLO 1 proceso para evitar race conditions
+                'tries' => 3,
+                'timeout' => 120,      // 2 mins, suficiente para actualizaciones
+                'memory' => 64,
+            ],
         ],
 
         'local' => [
@@ -247,12 +256,21 @@ return [
             ],
             'notifications-supervisor' => [
                 'connection' => 'redis',
-                'queue' => ['notifications', 'default'], // Incluimos 'default' para otros jobs de desarrollo
+                'queue' => ['notifications'], // Removemos 'default' para evitar conflictos
                 'balance' => 'simple',
                 'processes' => 2,
                 'tries' => 3,
                 'timeout' => 240,
                 'memory' => 128,
+            ],
+            'appointment-updates-supervisor' => [
+                'connection' => 'redis',
+                'queue' => ['default'],
+                'balance' => 'simple',
+                'processes' => 1,      // SOLO 1 proceso en local también
+                'tries' => 3,
+                'timeout' => 120,
+                'memory' => 64,
             ],
         ],
     ],

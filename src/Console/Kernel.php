@@ -23,6 +23,7 @@ class Kernel extends ConsoleKernel
         DispatchJob::class,
         \Core\Console\HealthCheckCommand::class,
         \App\Console\Commands\RunWhatsappJob::class,
+        \App\Console\Commands\RunPendingAppointmentsJob::class,
     ];
 
     /**

@@ -9,7 +9,7 @@ use Core\BoundedContext\AppointmentManagement\Infrastructure\Persistence\Schedul
 use Core\BoundedContext\AppointmentManagement\Application\DTOs\AppointmentDTO;
 use Carbon\Carbon;
 
-class GetUpcomingAppointmentsByPatientHandler
+class GetPendingAppointmentsByPatientHandler
 {
     public function __construct(
         private AppointmentRepositoryInterface $repository,
@@ -23,7 +23,7 @@ class GetUpcomingAppointmentsByPatientHandler
      */
     public function handle(string $patientId, string $fromDate): array
     {
-        $appointments = $this->repository->findByPatientAndDate($patientId, $fromDate);
+        $appointments = $this->repository->findPendingAppointmentsByPatientAndDate($patientId, $fromDate);
         $filteredAppointments = $this->filterConsecutiveAppointments($appointments);
         return array_map(fn($apt) => AppointmentDTO::fromDomain($apt)->toArray(), $filteredAppointments);
     }

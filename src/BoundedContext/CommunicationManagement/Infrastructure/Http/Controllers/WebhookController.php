@@ -2,6 +2,7 @@
 
 namespace Core\BoundedContext\CommunicationManagement\Infrastructure\Http\Controllers;
 
+use Core\Jobs\UpdateAppointmentStatusJob;
 use Core\BoundedContext\CommunicationManagement\Application\Jobs\ProcessWebhookJob;
 use Core\BoundedContext\CommunicationManagement\Application\Services\HandleInboundWebhookService;
 use Core\BoundedContext\CommunicationManagement\Infrastructure\Http\Requests\BirdWebhookRequest;
@@ -27,12 +28,36 @@ class WebhookController extends Controller
             $payload = $request->all();
 
             // Log detallado del tipo de webhook
-            $webhookType = $payload['type'] ?? 'unknown';
+            $webhookType = $payload['type'] ?? 'voz';
             Log::info("Procesando webhook de tipo: {$webhookType}", [
-                'payload' => $payload
+                'payload' => $payload,
+                'callId' => $payload['callId'] ?? null,
             ]);
 
-            //ProcessWebhookJob::dispatch($payload);
+            $appointmentId = $payload['appointment_id'];
+            $centerKey = 'datosipsndx';
+
+            // Si el usuario presionó 1 (confirmar)
+            if ($payload['key'] === '1') {
+                UpdateAppointmentStatusJob::confirm(
+                    $appointmentId,
+                    $centerKey,
+                    $payload['callId'] ?? null,
+                    'voz'
+                );
+            }
+            // Si el usuario presionó otra tecla (cancelar)
+            else {
+                if ($payload['key'] != null) {
+                    UpdateAppointmentStatusJob::cancel(
+                        $appointmentId,
+                        $centerKey,
+                        $payload['callId'] ?? null,
+                        'voz',
+                        'Cancelled by user via phone call'
+                    );
+                }
+            }
 
             return response()->json([
                 'status' => 'success',
