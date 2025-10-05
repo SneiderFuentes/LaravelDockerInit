@@ -55,7 +55,7 @@ class WebhookNotifierService
         $webhookUrls = config('services.messagebird.webhooks.appointment_flow_webhook');
         $birdKey = config('services.messagebird.api_key');
 
-        $urls = is_string($webhookUrls) ? array_map('trim', explode(',', $webhookUrls)) : [$webhookUrls];
+        $urls = is_string($webhookUrls) ? array_map('trim', explode(',', $webhookUrls)) : (is_array($webhookUrls) ? $webhookUrls : [$webhookUrls]);
 
         foreach ($urls as $index => $webhookUrl) {
             if (empty($webhookUrl)) {
