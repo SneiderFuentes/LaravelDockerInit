@@ -261,12 +261,12 @@ final class AppointmentController extends Controller
         $time = $this->formatTimeSlot($appointment->timeSlot);
 
         // Mapeo de estado
-        $statusMap = [
-            'pending' => 'Pendiente de Confirmar',
-            'confirmed' => 'Confirmada',
-            'cancelled' => 'Cancelada',
-        ];
-        $formattedStatus = $statusMap[$appointment->status->value] ?? ucfirst($appointment->status->value);
+        // $statusMap = [
+        //     'pending' => 'Pendiente de Confirmar',
+        //     'confirmed' => 'Confirmada',
+        //     'cancelled' => 'Cancelada',
+        // ];
+        // $formattedStatus = $statusMap[$appointment->status->value] ?? ucfirst($appointment->status->value);
 
         $detail = "*Detalles de la Cita (ID: " . $appointment->id . "):*\n\n";
         $detail .= "*Fecha:* " . $formattedDate . "\n";
@@ -274,7 +274,7 @@ final class AppointmentController extends Controller
         $detail .= "*Médico:* " . $doctorName . "\n";
         $detail .= "*Paciente:* " . $appointment->patientName . "\n";
         $detail .= "*Teléfono:* " . $appointment->patientPhone . "\n";
-        $detail .= "*Estado:* " . $formattedStatus . "\n";
+        // $detail .= "*Estado:* " . $formattedStatus . "\n";
 
         // Añadir información de confirmación si existe
         if ($appointment->confirmationDate) {
