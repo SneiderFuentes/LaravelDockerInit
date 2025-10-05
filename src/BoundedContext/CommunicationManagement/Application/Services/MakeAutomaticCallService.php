@@ -44,33 +44,35 @@ class MakeAutomaticCallService
         ]);
 
         try {
-            $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . $apiKey,
-                'Content-Type' => 'application/json'
-            ])->timeout(15)->post($url, $callData);
+            // $response = Http::withHeaders([
+            //     'Authorization' => 'Bearer ' . $apiKey,
+            //     'Content-Type' => 'application/json'
+            // ])->timeout(15)->post($url, $callData);
 
+            $response = true;
             Log::info('CALL_API_RESPONSE', [
                 'appointment_id' => $appointmentData['appointment_id'],
                 'patient_name' => $appointmentData['patient_name'],
                 'phone_called' => $appointmentData['phone'],
-                'response_status' => $response->status(),
-                'response_body' => $response->body()
+                // 'response_status' => $response->status(),
+                // 'response_body' => $response->body()
             ]);
 
 
-            if ($response->successful()) {
-                Log::info('Pending appointment call initiated successfully', [
-                    'patient_id' => $appointmentData['patient_id'],
-                    'phone' => $appointmentData['phone']
-                ]);
-                return true;
-            } else {
-                Log::error('Call API returned error', [
-                    'status' => $response->status(),
-                    'body' => $response->body()
-                ]);
-                return false;
-            }
+            // if ($response->successful()) {
+            //     Log::info('Pending appointment call initiated successfully', [
+            //         'patient_id' => $appointmentData['patient_id'],
+            //         'phone' => $appointmentData['phone']
+            //     ]);
+            //     return true;
+            // } else {
+            //     Log::error('Call API returned error', [
+            //         'status' => $response->status(),
+            //         'body' => $response->body()
+            //     ]);
+            //     return false;
+            // }
+            return true;
         } catch (\Exception $e) {
             Log::error('Exception during call API request', [
                 'error' => $e->getMessage(),

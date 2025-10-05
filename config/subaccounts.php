@@ -81,6 +81,7 @@ return [
                         'confirmation_channel_id' => 'IdMedioConfirmacion',
                         'fulfilled' => 'Cumplida',
                         'observations' => 'Observaciones',
+                        'remonte' => 'Remonte',
                     ],
                 ],
                 'schedules' => [

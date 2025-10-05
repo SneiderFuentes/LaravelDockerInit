@@ -607,6 +607,7 @@ final class GenericDbAppointmentRepository extends BaseRepository implements App
             )
             ->where("{$appointmentTable}.{$mapping['patient_id']}", $patientId)
             ->where("{$appointmentTable}.{$mapping['canceled']}", 0)
+            ->where("{$appointmentTable}.{$mapping['remonte']}", 0) // Solo citas no remontadas
             ->where("{$appointmentTable}.{$mapping['date']}", '>=', $date)
             ->orderBy("{$appointmentTable}.{$mapping['date']}")
             ->orderBy("{$appointmentTable}.{$mapping['time_slot']}")
@@ -656,6 +657,7 @@ final class GenericDbAppointmentRepository extends BaseRepository implements App
             ->where("{$appointmentTable}.{$mapping['patient_id']}", $patientId)
             ->where("{$appointmentTable}.{$mapping['canceled']}", 0) // No canceladas
             ->where("{$appointmentTable}.{$mapping['confirmed']}", 0) // No confirmadas
+            ->where("{$appointmentTable}.{$mapping['remonte']}", 0) // Solo citas no remontadas
             ->where("{$appointmentTable}.{$mapping['date']}", '>=', $date)
             ->orderBy("{$appointmentTable}.{$mapping['date']}")
             ->orderBy("{$appointmentTable}.{$mapping['time_slot']}")
@@ -769,6 +771,7 @@ final class GenericDbAppointmentRepository extends BaseRepository implements App
             ->where("{$appointmentsTable}.{$appointmentsMapping['date']}", '>=', $startDate->format('Y-m-d'))
             ->where("{$appointmentsTable}.{$appointmentsMapping['date']}", '<=', $endDate->format('Y-m-d'))
             ->where("{$appointmentsTable}.{$appointmentsMapping['canceled']}", 0) // Solo citas activas
+            ->where("{$appointmentsTable}.{$appointmentsMapping['remonte']}", 0) // Solo citas no remontadas
             ->groupBy("{$appointmentsTable}.{$appointmentsMapping['patient_id']}")
             ->pluck($appointmentsMapping['patient_id']);
 
@@ -804,6 +807,7 @@ final class GenericDbAppointmentRepository extends BaseRepository implements App
             ->where("{$appointmentsTable}.{$appointmentsMapping['date']}", '<=', $endDate->format('Y-m-d'))
             ->where("{$appointmentsTable}.{$appointmentsMapping['canceled']}", 0) // No canceladas
             ->where("{$appointmentsTable}.{$appointmentsMapping['confirmed']}", 0) // No confirmadas
+            ->where("{$appointmentsTable}.{$appointmentsMapping['remonte']}", 0) // Solo citas no remontadas
             ->groupBy("{$appointmentsTable}.{$appointmentsMapping['patient_id']}")
             ->pluck($appointmentsMapping['patient_id']);
 
