@@ -72,8 +72,7 @@ class GetUniquePendingPatientsByDateRange implements ShouldQueue
                         $patientId,
                         $this->centerKey,
                         $appointmentDate,
-                    )->delay(now()->addSeconds($jobsDispatched * 2));
-                // Espaciar jobs 2 segundos
+                    )->delay(now()->addMinutes($jobsDispatched));
                 $jobsDispatched++;
             }
 
