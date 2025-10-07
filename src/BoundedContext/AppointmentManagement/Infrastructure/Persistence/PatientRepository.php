@@ -87,4 +87,23 @@ class PatientRepository extends BaseRepository implements PatientRepositoryInter
         // Retornar el paciente creado
         return $id;
     }
+
+    public function updatePatient(int|string $patientId, array $data): int
+    {
+        $config = $this->getConfig();
+        $table = $config->tables()['patients']['table'];
+        $mapping = $config->tables()['patients']['mapping'];
+        $connection = $config->connection();
+
+        $updateData = [
+            $mapping['entity_code'] => $data['entity_code'],
+            $mapping['updated_at'] => now(),
+        ];
+
+        DB::connection($connection)->table($table)
+            ->where($mapping['id'], $patientId)
+            ->update($updateData);
+
+        return is_int($patientId) ? $patientId : (int)$patientId;
+    }
 }
