@@ -218,7 +218,7 @@ class PlanAppointmentsJob implements ShouldQueue
 
             $cupData = $cupRepo->findByCode($cupCode);
             if (!$cupData) {
-                $rejected[] = ['cups' => $cupCode, 'descripcion' => $proc['descripcion'], 'reason' => 'No se encuentra en nuestro catálogo.'];
+                $rejected[] = ['cups' => $cupCode, 'descripcion' => $proc['descripcion'], 'reason' => 'No fue posible realizar tu solicitud.'];
                 continue;
             }
             if (($cupData['is_active'] ?? 0) != 1) {
