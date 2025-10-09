@@ -24,6 +24,7 @@ class Kernel extends ConsoleKernel
         \Core\Console\HealthCheckCommand::class,
         \App\Console\Commands\RunWhatsappJob::class,
         \App\Console\Commands\RunPendingAppointmentsJob::class,
+        \App\Console\Commands\SendSpecificAgendaMessages::class,
     ];
 
     /**
@@ -45,13 +46,12 @@ class Kernel extends ConsoleKernel
 
         // Programar el envío de mensajes de WhatsApp diariamente a las 11:00
         $schedule->command('whatsapp:send-messages')
-            ->dailyAt('10:00')
+            ->dailyAt('7:00')
             ->withoutOverlapping();
 
-        // Programar llamadas para usuarios que no han confirmado a las 16:00
-        $schedule->job(new CallUnconfirmedUsers())
-            ->dailyAt('16:00')
-            ->withoutOverlapping();
+        $schedule->command('appointments:send-pending-messages')
+        ->dailyAt('15:00')
+        ->withoutOverlapping();
     }
 
     /**

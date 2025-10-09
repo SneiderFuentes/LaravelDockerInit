@@ -571,7 +571,7 @@ final class GenericDbAppointmentRepository extends BaseRepository implements App
         ])->toArray();
     }
 
-    public function findByPatientAndDate(int|string $patientId, string $date): array
+    public function findByPatientAndDate(int|string $patientId, string $date, ?int $agendaId = null, ?string $doctorDocument = null): array
     {
         $config = $this->getConfig(self::CENTER_KEY);
         $connection = DB::connection($config->connection());
@@ -580,7 +580,7 @@ final class GenericDbAppointmentRepository extends BaseRepository implements App
         $appointmentTable = $config->tableName('appointments');
         $patientTable = $config->tableName('patients');
 
-        $results = $connection->table($appointmentTable)
+        $query = $connection->table($appointmentTable)
             ->select([
                 "{$appointmentTable}.{$mapping['id']} as id",
                 "{$appointmentTable}.{$mapping['date']} as date",
@@ -607,9 +607,18 @@ final class GenericDbAppointmentRepository extends BaseRepository implements App
             )
             ->where("{$appointmentTable}.{$mapping['patient_id']}", $patientId)
             ->where("{$appointmentTable}.{$mapping['canceled']}", 0)
-            ->where("{$appointmentTable}.{$mapping['remonte']}", 0) // Solo citas no remontadas
-            ->where("{$appointmentTable}.{$mapping['date']}", '>=', $date)
-            ->orderBy("{$appointmentTable}.{$mapping['date']}")
+            ->where("{$appointmentTable}.{$mapping['remonte']}", 0)
+            ->where("{$appointmentTable}.{$mapping['date']}", '>=', $date);
+
+        if ($agendaId !== null) {
+            $query->where("{$appointmentTable}.{$mapping['agenda_id']}", $agendaId);
+        }
+
+        if ($doctorDocument !== null) {
+            $query->where("{$appointmentTable}.{$mapping['doctor_id']}", $doctorDocument);
+        }
+
+        $results = $query->orderBy("{$appointmentTable}.{$mapping['date']}")
             ->orderBy("{$appointmentTable}.{$mapping['time_slot']}")
             ->get();
 
@@ -757,7 +766,9 @@ final class GenericDbAppointmentRepository extends BaseRepository implements App
     public function findUniquePatientDocumentsInDateRange(
         string $centerKey,
         DateTime $startDate,
-        DateTime $endDate
+        DateTime $endDate,
+        ?int $agendaId = null,
+        ?string $doctorDocument = null
     ): array {
         $config = $this->getConfig($centerKey);
         $connection = DB::connection($config->connection());
@@ -765,20 +776,30 @@ final class GenericDbAppointmentRepository extends BaseRepository implements App
         $appointmentsTable = $config->tableName('appointments');
         $appointmentsMapping = $config->mapping('appointments');
 
-        // Consulta optimizada para obtener solo cédulas únicas de pacientes con citas en el rango
-        $results = $connection->table($appointmentsTable)
+        $query = $connection->table($appointmentsTable)
             ->select("{$appointmentsTable}.{$appointmentsMapping['patient_id']}")
             ->where("{$appointmentsTable}.{$appointmentsMapping['date']}", '>=', $startDate->format('Y-m-d'))
             ->where("{$appointmentsTable}.{$appointmentsMapping['date']}", '<=', $endDate->format('Y-m-d'))
-            ->where("{$appointmentsTable}.{$appointmentsMapping['canceled']}", 0) // Solo citas activas
-            ->where("{$appointmentsTable}.{$appointmentsMapping['remonte']}", 0) // Solo citas no remontadas
-            ->groupBy("{$appointmentsTable}.{$appointmentsMapping['patient_id']}")
+            ->where("{$appointmentsTable}.{$appointmentsMapping['canceled']}", 0)
+            ->where("{$appointmentsTable}.{$appointmentsMapping['remonte']}", 0);
+
+        if ($agendaId !== null) {
+            $query->where("{$appointmentsTable}.{$appointmentsMapping['agenda_id']}", $agendaId);
+        }
+
+        if ($doctorDocument !== null) {
+            $query->where("{$appointmentsTable}.{$appointmentsMapping['doctor_id']}", $doctorDocument);
+        }
+
+        $results = $query->groupBy("{$appointmentsTable}.{$appointmentsMapping['patient_id']}")
             ->pluck($appointmentsMapping['patient_id']);
 
         Log::info('Unique patient documents query completed', [
             'center_key' => $centerKey,
             'start_date' => $startDate->format('Y-m-d H:i:s'),
             'end_date' => $endDate->format('Y-m-d H:i:s'),
+            'agenda_id' => $agendaId,
+            'doctor_document' => $doctorDocument,
             'unique_patient_ids_found' => count($results)
         ]);
 
@@ -876,5 +897,83 @@ final class GenericDbAppointmentRepository extends BaseRepository implements App
             ->pluck($mapping['id']);
 
         return $results->toArray();
+    }
+
+    public function cancelAppointmentsByAgendaAndDate(int $agendaId, string $doctorDocument, string $date): int
+    {
+        $config = $this->getConfig(self::CENTER_KEY);
+        $connection = DB::connection($config->connection());
+        $mapping = $config->mapping('appointments');
+        $table = $config->tableName('appointments');
+
+        $updated = $connection->table($table)
+            ->where($mapping['agenda_id'], $agendaId)
+            ->where($mapping['doctor_id'], $doctorDocument)
+            ->where($mapping['date'], $date)
+            ->where($mapping['canceled'], 0)
+            ->update([
+                $mapping['canceled'] => -1,
+                $mapping['cancel_date'] => now(),
+                $mapping['confirmed'] => 0,
+                $mapping['confirmation_date'] => null,
+                $mapping['confirmation_channel_id'] => null,
+            ]);
+
+        Log::info('Appointments cancelled by agenda and date', [
+            'agenda_id' => $agendaId,
+            'doctor_document' => $doctorDocument,
+            'date' => $date,
+            'cancelled_count' => $updated
+        ]);
+
+        return $updated;
+    }
+
+    public function updateAppointmentsDate(int $agendaId, string $doctorDocument, string $currentDate, string $newDate): int
+    {
+        $config = $this->getConfig(self::CENTER_KEY);
+        $connection = DB::connection($config->connection());
+        $mapping = $config->mapping('appointments');
+        $table = $config->tableName('appointments');
+
+        // Obtener todas las citas que se van a actualizar
+        $appointments = $connection->table($table)
+            ->where($mapping['agenda_id'], $agendaId)
+            ->where($mapping['doctor_id'], $doctorDocument)
+            ->where($mapping['date'], $currentDate)
+            ->get();
+
+        $updated = 0;
+        foreach ($appointments as $appointment) {
+            // Extraer la hora del time_slot (últimos 4 dígitos HHmm)
+            $timeSlot = $appointment->{$mapping['time_slot']};
+            $timeOnly = substr($timeSlot, -4); // Ejemplo: 1430 de 202510151430
+
+            // Construir nuevo time_slot con nueva fecha
+            $newDateFormatted = str_replace('-', '', $newDate); // 2025-10-15 -> 20251015
+            $newTimeSlot = $newDateFormatted . $timeOnly; // 20251015 + 1430 = 202510151430
+
+            // Actualizar el registro
+            $connection->table($table)
+                ->where($mapping['id'], $appointment->{$mapping['id']})
+                ->update([
+                    $mapping['date'] => $newDate,
+                    $mapping['time_slot'] => $newTimeSlot,
+                    $mapping['confirmed'] => 0,
+                    $mapping['confirmation_date'] => null,
+                ]);
+
+            $updated++;
+        }
+
+        Log::info('Appointments dates updated', [
+            'agenda_id' => $agendaId,
+            'doctor_document' => $doctorDocument,
+            'current_date' => $currentDate,
+            'new_date' => $newDate,
+            'updated_count' => $updated
+        ]);
+
+        return $updated;
     }
 }

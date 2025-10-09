@@ -22,6 +22,7 @@ use Core\BoundedContext\AppointmentManagement\Infrastructure\Http\Controllers\Gl
 use Core\BoundedContext\AppointmentManagement\Infrastructure\Http\Controllers\ConfirmAppointmentController;
 use Core\BoundedContext\AppointmentManagement\Infrastructure\Http\Controllers\CheckExistingAppointmentController;
 use Core\BoundedContext\AppointmentManagement\Infrastructure\Http\Controllers\AsyncUpdatePatientController;
+use Core\BoundedContext\AppointmentManagement\Infrastructure\Http\Controllers\RescheduleAgendaController;
 
 
 Route::prefix('api/centers/{centerKey}')->group(function () {
@@ -36,6 +37,7 @@ Route::prefix('api/centers/{centerKey}')->group(function () {
         Route::post('async-appointments/available-slots', AsyncGetAvailableSlotsByCupController::class);
         Route::post('calculate-glomerular-filtration', GlomerularFiltrationController::class);
         Route::post('appointments/check-existing', CheckExistingAppointmentController::class);
+        Route::post('appointments/reschedule-agenda', RescheduleAgendaController::class);
 
         Route::get('async-entities', AsyncGetActiveEntitiesController::class);
 

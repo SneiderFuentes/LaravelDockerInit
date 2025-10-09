@@ -84,7 +84,7 @@ interface AppointmentRepositoryInterface
      * Devuelve las citas de un paciente y fecha específica
      * @return array
      */
-    public function findByPatientAndDate(int|string $patientId, string $date): array;
+    public function findByPatientAndDate(int|string $patientId, string $date, ?int $agendaId = null, ?string $doctorDocument = null): array;
 
     /**
      * Obtiene IDs únicos de pacientes con citas PENDIENTES en el rango de fechas
@@ -138,12 +138,16 @@ interface AppointmentRepositoryInterface
      * @param string $centerKey
      * @param DateTime $startDate
      * @param DateTime $endDate
+     * @param int|null $agendaId
+     * @param string|null $doctorDocument
      * @return array Array of unique patient documents with appointment data
      */
     public function findUniquePatientDocumentsInDateRange(
         string $centerKey,
         DateTime $startDate,
-        DateTime $endDate
+        DateTime $endDate,
+        ?int $agendaId = null,
+        ?string $doctorDocument = null
     ): array;
 
     /**
@@ -167,4 +171,14 @@ interface AppointmentRepositoryInterface
         array $cupCodes,
         string $centerKey
     ): int;
+
+    /**
+     * Cancel all appointments for a specific agenda, doctor and date
+     */
+    public function cancelAppointmentsByAgendaAndDate(int $agendaId, string $doctorDocument, string $date): int;
+
+    /**
+     * Update appointments date for a specific agenda, doctor and date
+     */
+    public function updateAppointmentsDate(int $agendaId, string $doctorDocument, string $currentDate, string $newDate): int;
 }

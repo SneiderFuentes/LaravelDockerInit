@@ -104,6 +104,42 @@ class SendWhatsappMessageService
             }
     }
 
+    public function sendRescheduleNotificationFlow(array $rescheduleData): bool
+    {
+            $url = env('BIRD_FLOW_RESCHEDULE_NOTIFICATION');
+            $apiKey = env('FLOW_APPOINMENT_WEBHOOK_API_KEY');
+
+            if (!$url || !$apiKey) {
+                Log::error('Missing Bird flow reschedule notification configuration', [
+                    'url' => $url ? 'configured' : 'missing',
+                    'api_key' => $apiKey ? 'configured' : 'missing'
+                ]);
+                return false;
+            }
+
+            // $response = Http::withHeaders([
+            //     'Authorization' => 'Bearer ' . $apiKey,
+            //     'Content-Type' => 'application/json'
+            // ])->post($url, $rescheduleData);
+
+            Log::info('AFTER REQUEST - Bird reschedule notification response received', [
+                'appointment_id' => $rescheduleData['appointment_id'] ?? 'unknown',
+                'patient_name' => $rescheduleData['patient_name'] ?? 'unknown',
+                'phone_sent' => $rescheduleData['phone'] ?? 'unknown',
+                'previous_date' => $rescheduleData['appointment_date_cancel'] ?? 'unknown',
+                'new_date' => $rescheduleData['appointment_date_new'] ?? 'unknown',
+                // 'response_status' => $response->status(),
+                // 'response_headers' => $response->headers(),
+                // 'response_body' => $response->body()
+            ]);
+            return true;
+            // if ($response->successful()) {
+            //     return true;
+            // } else {
+            //     return false;
+            // }
+    }
+
     /**
      * Envía un flujo de recordatorio de cita PENDIENTE a través de Bird
      */

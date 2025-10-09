@@ -72,4 +72,60 @@ class ScheduleRepository extends BaseRepository implements ScheduleRepositoryInt
             array_map(fn($key) => $row->{$mapping[$key]} ?? null, array_keys($mapping))
         ))->toArray();
     }
+
+    public function deleteWorkingDayException(int $agendaId, string $doctorDocument, string $date): bool
+    {
+        $config = $this->getConfig();
+        $workingDaysConfig = $config->tables()['working_days'];
+        $table = $workingDaysConfig['table'];
+        $mapping = $workingDaysConfig['mapping'];
+        $connection = $config->connection();
+
+        $deleted = DB::connection($connection)
+            ->table($table)
+            ->where($mapping['agenda_id'], $agendaId)
+            ->where($mapping['doctor_document'], $doctorDocument)
+            ->where($mapping['date'], $date)
+            ->delete();
+
+        return $deleted > 0;
+    }
+
+    public function findWorkingDayException(int $agendaId, string $doctorDocument, string $date): ?array
+    {
+        $config = $this->getConfig();
+        $workingDaysConfig = $config->tables()['working_days'];
+        $table = $workingDaysConfig['table'];
+        $mapping = $workingDaysConfig['mapping'];
+        $connection = $config->connection();
+
+        $row = DB::connection($connection)
+            ->table($table)
+            ->where($mapping['agenda_id'], $agendaId)
+            ->where($mapping['doctor_document'], $doctorDocument)
+            ->where($mapping['date'], $date)
+            ->first();
+
+        return $row ? ArrayMapper::mapToLogicalFields($row, $mapping) : null;
+    }
+
+    public function updateWorkingDayExceptionDate(int $agendaId, string $doctorDocument, string $currentDate, string $newDate): bool
+    {
+        $config = $this->getConfig();
+        $workingDaysConfig = $config->tables()['working_days'];
+        $table = $workingDaysConfig['table'];
+        $mapping = $workingDaysConfig['mapping'];
+        $connection = $config->connection();
+
+        $updated = DB::connection($connection)
+            ->table($table)
+            ->where($mapping['agenda_id'], $agendaId)
+            ->where($mapping['doctor_document'], $doctorDocument)
+            ->where($mapping['date'], $currentDate)
+            ->update([
+                $mapping['date'] => $newDate
+            ]);
+
+        return $updated > 0;
+    }
 }

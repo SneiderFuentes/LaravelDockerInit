@@ -280,8 +280,8 @@ final class AppointmentController extends Controller
         if ($appointment->confirmationDate) {
             $confirmationDate = Carbon::parse($appointment->confirmationDate)->locale('es')->isoFormat('dddd D [de] MMMM [de] YYYY [a las] HH:mm');
             $channelType = $appointment->confirmationChannelType ? ucfirst($appointment->confirmationChannelType->value) : 'No especificado';
-            $detail .= "*Confirmada el:* " . $confirmationDate . "\n";
-            $detail .= "*Canal de confirmación:* " . $channelType . "\n";
+            // $detail .= "*Confirmada el:* " . $confirmationDate . "\n";
+            // $detail .= "*Canal de confirmación:* " . $channelType . "\n";
         }
 
         // Añadir dirección si existe en los CUPs
