@@ -117,10 +117,10 @@ class SendWhatsappMessageService
                 return false;
             }
 
-            // $response = Http::withHeaders([
-            //     'Authorization' => 'Bearer ' . $apiKey,
-            //     'Content-Type' => 'application/json'
-            // ])->post($url, $rescheduleData);
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $apiKey,
+                'Content-Type' => 'application/json'
+            ])->post($url, $rescheduleData);
 
             Log::info('AFTER REQUEST - Bird reschedule notification response received', [
                 'appointment_id' => $rescheduleData['appointment_id'] ?? 'unknown',
@@ -128,16 +128,15 @@ class SendWhatsappMessageService
                 'phone_sent' => $rescheduleData['phone'] ?? 'unknown',
                 'previous_date' => $rescheduleData['appointment_date_cancel'] ?? 'unknown',
                 'new_date' => $rescheduleData['appointment_date_new'] ?? 'unknown',
-                // 'response_status' => $response->status(),
-                // 'response_headers' => $response->headers(),
-                // 'response_body' => $response->body()
+                'response_status' => $response->status(),
+                'response_headers' => $response->headers(),
+                'response_body' => $response->body()
             ]);
-            return true;
-            // if ($response->successful()) {
-            //     return true;
-            // } else {
-            //     return false;
-            // }
+            if ($response->successful()) {
+                return true;
+            } else {
+                return false;
+            }
     }
 
     /**
