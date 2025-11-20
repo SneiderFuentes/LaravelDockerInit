@@ -30,7 +30,8 @@ interface AppointmentRepositoryInterface
         string $timeSlot,
         string $entity,
         int $agendaId,
-        bool $is_contrasted
+        bool $is_contrasted,
+        bool $is_sedated = false
     ): Appointment;
 
     /**
@@ -181,4 +182,14 @@ interface AppointmentRepositoryInterface
      * Update appointments date for a specific agenda, doctor and date
      */
     public function updateAppointmentsDate(int $agendaId, string $doctorDocument, string $currentDate, string $newDate): int;
+
+    /**
+     * Find the last doctor who attended a patient for specific CUPS codes (consultation)
+     * Returns the doctor document number or null if no previous appointment found
+     *
+     * @param string $patientId
+     * @param array $cupCodes Array of CUPS codes to search for (e.g., ['890374', '890274'])
+     * @return string|null Doctor document number
+     */
+    public function findLastDoctorForPatientByCups(string $patientId, array $cupCodes): ?string;
 }

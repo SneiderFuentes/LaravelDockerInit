@@ -44,6 +44,32 @@ final class CreateAppointmentHandler
             throw new InvalidArgumentException('No se pueden crear citas en fechas pasadas');
         }
 
+        // Validar restricciones para exámenes contrastados
+        if ($command->is_contrasted) {
+            // Verificar que no sea sábado (6 = Sábado)
+            $weekday = (int)date('w', strtotime($command->date));
+            if ($weekday === 6) {
+                throw new InvalidArgumentException(
+                    'Los exámenes contrastados no pueden agendarse los sábados'
+                );
+            }
+
+            // Verificar que sea antes de las 17:00
+            if ($command->time >= '17:00') {
+                throw new InvalidArgumentException(
+                    'Los exámenes contrastados solo pueden agendarse hasta las 5:00 PM'
+                );
+            }
+        }
+
+        // Logging para procedimientos con sedación
+        if ($command->is_sedated) {
+            Log::info('Creando cita con sedación', [
+                'agendaId' => $command->agendaId,
+                'patientId' => $command->patientId
+            ]);
+        }
+
         $patient = $this->patientRepository->findById($command->patientId);
         if (!$patient) {
             throw new InvalidArgumentException('Paciente no encontrado');
@@ -86,7 +112,8 @@ final class CreateAppointmentHandler
                 $formattedTimeSlot,
                 $mainEntityCode,
                 $command->agendaId,
-                $command->is_contrasted
+                $command->is_contrasted,
+                $command->is_sedated
             );
 
             if ($i === 0) {

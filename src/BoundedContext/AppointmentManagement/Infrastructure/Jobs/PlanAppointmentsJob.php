@@ -81,18 +81,22 @@ class PlanAppointmentsJob implements ShouldQueue
             // 3. Consolidar resultados y construir el mensaje
             $finalSummary = "";
             if (!empty($allGroupedAppointments)) {
-                $finalSummary = "De tu orden médica, hemos organizado las siguientes citas. Elige la que desees programar enviando 1, 2, 3, etc. según el número de la cita.\n\n";
+                $finalSummary = "🩺 De tu orden hemos identificado las siguientes citas disponibles 👇\n\n";
                 foreach ($allGroupedAppointments as $index => $appointment) {
                     $appointmentNumber = $index + 1;
-                    $finalSummary .= "*{$appointmentNumber}.* Incluye los siguientes procedimientos:\n";
+                    $finalSummary .= "*Cita {$appointmentNumber}.* Incluye los siguientes procedimientos:\n";
                     if (!empty($appointment['procedures'])) {
                         foreach ($appointment['procedures'] as $procedure) {
                             $clientType = $procedure['client_type'] === 'affiliate' ? 'Afiliado' : 'Particular';
-                            $finalSummary .= " - {$procedure['descripcion']} ({$procedure['cups']}) - {$clientType}\n";
+                            $finalSummary .= "  • {$procedure['descripcion']} ({$procedure['cups']}) - {$clientType}\n";
                         }
                     }
                     $finalSummary .= "\n";
                 }
+
+                $finalSummary .= "Por favor responde únicamente con el número de la opción que deseas programar ✍️\n";
+                $finalSummary .= "(Ejemplo: escribe *1* si deseas la primera cita)\n";
+                $finalSummary .= "(Ejemplo: escribe *2* si deseas la segunda cita)";
             } elseif (empty($finalSummary) && !empty($enrichedProcedures)) {
                 $finalSummary = "Hemos procesado tu orden. Por favor, revisa las citas sugeridas.";
             } else {
@@ -255,6 +259,8 @@ class PlanAppointmentsJob implements ShouldQueue
             $proc['service_id'] = $cupData['service_id'];
             $proc['specialty_id'] = $cupData['specialty_id'];
             $proc['service_name'] = $cupData['service_name'];
+            // Asegurar que is_sedated tenga un valor por defecto si no viene de la orden
+            $proc['is_sedated'] = $proc['is_sedated'] ?? false;
             $enriched[] = $proc;
         }
 

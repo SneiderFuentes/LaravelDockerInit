@@ -36,29 +36,39 @@ class GetAvailableSlotsByCupJob implements ShouldQueue
     private int $espacios;
     private string $resumeKey;
     private int $patientAge;
+    private bool $isContrasted;
+    private bool $isSedated;
+    private string $patientId;
 
-    public function __construct(array $procedures, int $espacios, string $resumeKey, int $patientAge)
+    public function __construct(array $procedures, int $espacios, string $resumeKey, int $patientAge, bool $isContrasted, bool $isSedated = false, string $patientId = '')
     {
         $this->procedures = $procedures;
         $this->espacios = $espacios;
         $this->resumeKey = $resumeKey;
         $this->patientAge = $patientAge;
+        $this->isContrasted = $isContrasted;
+        $this->isSedated = $isSedated;
+        $this->patientId = $patientId;
     }
 
     public function handle(GetAvailableSlotsByCupHandler $handler, WebhookNotifierService $notifier): void
     {
         Log::info('----OBTENER ESPACIOS Job en ejecución', ['attempts' => $this->attempts()]);
         try {
-            $slots = $handler->handle($this->procedures, $this->espacios, $this->patientAge);
+            $slots = $handler->handle($this->procedures, $this->espacios, $this->patientAge, $this->isContrasted, $this->isSedated, $this->patientId);
 
             $selectionText = '';
             if (!empty($slots)) {
-                $selectionText = "Estos son los horarios que encontramos para ti. Por favor, elige uno enviando el número correspondiente:\n\n";
+                $selectionText = "Hemos encontrado los siguientes horarios disponibles 👇\n\n";
                 foreach ($slots as $index => $slot) {
                     $date = Carbon::parse($slot->fecha)->locale('es')->isoFormat('D [de] MMMM');
                     $optionNumber = $index + 1;
                     $selectionText .= "{$optionNumber}. {$date} a las {$slot->hora} con el Dr. {$slot->doctorName}.\n";
                 }
+
+                $selectionText .= "\nPor favor responde únicamente con el número de la opción que deseas programar ✍️\n";
+                $selectionText .= "(Ejemplo: escribe 1 si deseas el primer horario)\n";
+                $selectionText .= "(Ejemplo: escribe 2 si deseas el segundo horario)";
             } else {
                 $selectionText = "Lo sentimos, no hemos encontrado horarios disponibles para los procedimientos seleccionados. Por favor, intenta de nuevo en 24 horas";
             }

@@ -60,6 +60,7 @@ final class AsyncAppointmentController extends Controller
             'procedures' => 'required|array|min:1',
             'espacios' => 'required|integer|min:1',
             'is_contrasted' => 'required|boolean',
+            'is_sedated' => 'required|boolean',
         ]);
 
         $selectionIndex = $validated['selection'] - 1;
@@ -89,6 +90,7 @@ final class AsyncAppointmentController extends Controller
             'cups' => $cups,
             'espacios' => $validated['espacios'],
             'is_contrasted' => $validated['is_contrasted'],
+            'is_sedated' => $validated['is_sedated'],
         ];
 
         $resumeKey = Str::uuid()->toString();

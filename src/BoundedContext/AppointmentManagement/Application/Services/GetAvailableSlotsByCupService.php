@@ -23,11 +23,23 @@ class GetAvailableSlotsByCupService
     ) {}
 
     /**
+     * Mapeo de CUPS que requieren buscar el médico de una cita previa.
+     * Formato: 'CUPS_procedimiento' => ['CUPS_consulta1', 'CUPS_consulta2', ...]
+     *
+     * El sistema buscará la última cita del paciente con alguno de los CUPS del array
+     * y filtrará los slots para mostrar solo agendas del médico que lo atendió.
+     */
+    private const CUPS_REQUIRES_PREVIOUS_DOCTOR = [
+        '053105' => ['890374', '890274'], // Bloqueo unión mioneural → requiere consulta neurología previa
+        '861402' => ['890264', '890364'], // Fisiatria → requiere consulta fisiatría previa
+    ];
+
+    /**
      * @param string $cupId
      * @param int $espacios
      * @return AvailableSlotDTO[]
      */
-    public function execute(array $procedures, int $espacios, int $patientAge): array
+    public function execute(array $procedures, int $espacios, int $patientAge, bool $isContrasted, bool $isSedated = false, string $patientId = ''): array
     {
         if (empty($procedures) || empty($procedures[0]['cups'])) {
             return [];
@@ -44,6 +56,46 @@ class GetAvailableSlotsByCupService
         // Filtrar doctores que no atienden pacientes de cierta edad usando array estático
         $doctoresFiltrados = $this->filterDoctorsByAge($doctores, $patientAge);
 
+        // Caso especial: CUPS que requieren médico de cita previa
+        // Solo buscar agendas del médico que atendió la última consulta del paciente
+        if (isset(self::CUPS_REQUIRES_PREVIOUS_DOCTOR[$cupId]) && !empty($patientId)) {
+            $requiredPreviousCups = self::CUPS_REQUIRES_PREVIOUS_DOCTOR[$cupId];
+            $lastDoctorDocument = $this->appointmentRepository->findLastDoctorForPatientByCups(
+                $patientId,
+                $requiredPreviousCups
+            );
+
+            if ($lastDoctorDocument) {
+                Log::info('Filtering doctors for CUPS requiring previous consultation', [
+                    'cup_id' => $cupId,
+                    'patient_id' => $patientId,
+                    'last_doctor' => $lastDoctorDocument,
+                    'required_previous_cups' => $requiredPreviousCups
+                ]);
+
+                // Filtrar para dejar solo el médico de la última consulta
+                $doctoresFiltrados = array_filter($doctoresFiltrados, function ($doctor) use ($lastDoctorDocument) {
+                    return $doctor['doctor_document'] === $lastDoctorDocument;
+                });
+
+                if (empty($doctoresFiltrados)) {
+                    Log::warning('Previous consultation doctor not available for this procedure', [
+                        'patient_id' => $patientId,
+                        'last_doctor' => $lastDoctorDocument,
+                        'cup_id' => $cupId
+                    ]);
+                    return [];
+                }
+            } else {
+                Log::warning('No previous consultation found for patient - cannot schedule procedure', [
+                    'patient_id' => $patientId,
+                    'cup_id' => $cupId,
+                    'required_previous_cups' => $requiredPreviousCups
+                ]);
+                return [];
+            }
+        }
+
         $doctorDocuments = array_column($doctoresFiltrados, 'doctor_document');
         $doctorMap = [];
         foreach ($doctoresFiltrados as $doctor) {
@@ -53,6 +105,19 @@ class GetAvailableSlotsByCupService
 
         $daysAllDoctors = $this->scheduleRepository->findFutureWorkingDaysByDoctors($doctorDocuments);
         Log::info('daysAllDoctors', ['daysAllDoctors' => $daysAllDoctors]);
+
+        if ($isContrasted) {
+            Log::info('Aplicando restricciones para examen contrastado', [
+                'restricciones' => 'No sábados, límite 17:00'
+            ]);
+        }
+
+        if ($isSedated) {
+            Log::info('Aplicando restricciones para procedimiento con sedación', [
+                'restricciones' => 'Solo agendas con "sedación" en el nombre'
+            ]);
+        }
+
         $slots = [];
         $scheduleCache = [];
         $scheduleConfigCache = [];
@@ -63,14 +128,28 @@ class GetAvailableSlotsByCupService
             $doctorDocument = $day['doctor_document'];
             $doctorFullName = $doctorMap[$doctorDocument] ?? $doctorDocument;
 
+            $weekday = (int)date('w', strtotime($day['date']));
+
+            // Si es examen contrastado y es sábado, saltar este día
+            if ($isContrasted && $weekday === 6) {
+                continue;
+            }
+
             if ($day['agenda_id'] == 0) {
                 $schedule = ['id' => 0];
             } else {
-                if (isset($scheduleCache[$day['agenda_id']])) {
-                    $schedule = $scheduleCache[$day['agenda_id']];
+                // Determinar el tipo de agenda a buscar
+                $scheduleType = $cupInfo['type'];
+                if ($isSedated) {
+                    $scheduleType = 'sedacion'; // Forzar búsqueda de agendas de sedación
+                }
+
+                $cacheKey = $day['agenda_id'] . '_' . ($scheduleType ?? 'default');
+                if (isset($scheduleCache[$cacheKey])) {
+                    $schedule = $scheduleCache[$cacheKey];
                 } else {
-                    $schedule = $this->scheduleRepository->findByScheduleId($day['agenda_id'], $cupInfo['type']);
-                    $scheduleCache[$day['agenda_id']] = $schedule;
+                    $schedule = $this->scheduleRepository->findByScheduleId($day['agenda_id'], $scheduleType);
+                    $scheduleCache[$cacheKey] = $schedule;
                 }
                 if (!$schedule) continue;
             }
@@ -84,7 +163,6 @@ class GetAvailableSlotsByCupService
             if (!$scheduleConfig) continue;
 
             $assignedAppointments = $this->appointmentRepository->findByAgendaAndDate($day['agenda_id'], $day['date']);
-            $weekday = (int)date('w', strtotime($day['date']));
             $morningStartKey = 'morning_start_' . $days[$weekday];
             $morningEndKey = 'morning_end_' . $days[$weekday];
             $afternoonStartKey = 'afternoon_start_' . $days[$weekday];
@@ -92,15 +170,35 @@ class GetAvailableSlotsByCupService
 
             $workHours = [];
             if ($day['morning_enabled'] == -1 && !empty($scheduleConfig[$morningStartKey]) && !empty($scheduleConfig[$morningEndKey])) {
+                $morningEnd = $this->formatHour($scheduleConfig[$morningEndKey]);
+
+                // Si es contrastado, limitar la hora de fin a 17:00
+                if ($isContrasted && $morningEnd > '17:00') {
+                    $morningEnd = '17:00';
+                }
+
                 $workHours[] = [
                     'start' => $this->formatHour($scheduleConfig[$morningStartKey]),
-                    'end' => $this->formatHour($scheduleConfig[$morningEndKey]),
+                    'end' => $morningEnd,
                 ];
             }
             if ($day['afternoon_enabled'] == -1 && !empty($scheduleConfig[$afternoonStartKey]) && !empty($scheduleConfig[$afternoonEndKey])) {
+                $afternoonStart = $this->formatHour($scheduleConfig[$afternoonStartKey]);
+                $afternoonEnd = $this->formatHour($scheduleConfig[$afternoonEndKey]);
+
+                // Si es contrastado, limitar la hora de fin a 17:00
+                if ($isContrasted && $afternoonEnd > '17:00') {
+                    $afternoonEnd = '17:00';
+                }
+
+                // Si el inicio es después de las 17:00 y es contrastado, saltar este periodo
+                if ($isContrasted && $afternoonStart >= '17:00') {
+                    continue;
+                }
+
                 $workHours[] = [
-                    'start' => $this->formatHour($scheduleConfig[$afternoonStartKey]),
-                    'end' => $this->formatHour($scheduleConfig[$afternoonEndKey]),
+                    'start' => $afternoonStart,
+                    'end' => $afternoonEnd,
                 ];
             }
 
@@ -116,6 +214,15 @@ class GetAvailableSlotsByCupService
                     $slotEnd = (clone $start)->modify("+{$duration} minutes");
                     if ($slotEnd > $end) break;
                     $slotStartStr = $slotStart->format('H:i');
+
+                    // Si es contrastado, verificar que el slot termine antes de las 17:00
+                    if ($isContrasted) {
+                        $slotEndStr = $slotEnd->format('H:i');
+                        if ($slotEndStr > '17:00') {
+                            break; // No generar más slots este periodo
+                        }
+                    }
+
                     if (!in_array($slotStartStr, $assignedTimes)) {
                         $availableSlots[] = [
                             'start' => $slotStartStr,

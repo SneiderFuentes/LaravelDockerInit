@@ -61,7 +61,8 @@ class CreateAppointmentJob implements ShouldQueue
                 $this->requestData['time'],
                 $this->requestData['cups'],
                 (int)($this->requestData['espacios'] ?? 1),
-                $this->requestData['is_contrasted']
+                $this->requestData['is_contrasted'],
+                $this->requestData['is_sedated'] ?? false
             );
             Log::info('----CREAR CITA Job en ejecución', ['attempts' => $this->attempts()]);
             $result = $handler->handle($command);

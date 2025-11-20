@@ -10,8 +10,8 @@ class GetAvailableSlotsByCupHandler
 {
     public function __construct(private GetAvailableSlotsByCupService $service) {}
 
-    public function handle(array $procedures, int $espacios, int $patientAge): array
+    public function handle(array $procedures, int $espacios, int $patientAge, bool $isContrasted, bool $isSedated = false, string $patientId = ''): array
     {
-        return $this->service->execute($procedures, $espacios, $patientAge);
+        return $this->service->execute($procedures, $espacios, $patientAge, $isContrasted, $isSedated, $patientId);
     }
 }

@@ -36,6 +36,10 @@ class CreatePatientJob implements ShouldQueue
     {
         try {
             Log::info('----CREAR PACIENTE Job en ejecución', ['attempts' => $this->attempts()]);
+
+            // Sanitizar segundo nombre y segundo apellido
+            $this->data = $this->sanitizeOptionalNames($this->data);
+
             $patientId = $handler->handle($this->data);
 
             // Si llegamos aquí, el paciente fue creado. Cualquier otra excepción habría hecho que el job fallara.
@@ -65,5 +69,46 @@ class CreatePatientJob implements ShouldQueue
             }
             throw $e;
         }
+    }
+
+    /**
+     * Sanitiza segundo nombre y segundo apellido.
+     * Convierte valores como "NA", "N/A", "no aplica", etc. a null.
+     */
+    private function sanitizeOptionalNames(array $data): array
+    {
+        $fieldsToSanitize = ['second_name', 'second_last_name'];
+
+        // Patrones que indican "no aplica" (case-insensitive)
+        $naPatterns = [
+            'na',
+            'n/a',
+            'n.a',
+            'n.a.',
+            'no aplica',
+            'noaplica',
+            'no-aplica',
+            'ninguno',
+            'ninguna',
+            '-',
+            '.',
+            'null',
+            'none',
+        ];
+
+        foreach ($fieldsToSanitize as $field) {
+            if (isset($data[$field]) && is_string($data[$field])) {
+                $value = trim($data[$field]);
+                $normalizedValue = strtolower($value);
+
+                // Verificar si el valor coincide con algún patrón de "no aplica"
+                if (in_array($normalizedValue, $naPatterns, true) || $value === '') {
+                    $data[$field] = null;
+                    Log::info("Sanitized {$field} to null", ['original_value' => $value]);
+                }
+            }
+        }
+
+        return $data;
     }
 }

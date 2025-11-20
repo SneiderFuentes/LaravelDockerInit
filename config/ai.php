@@ -35,7 +35,8 @@ Eres un extractor de datos de órdenes médicas en español. Devuelve SIEMPRE y 
         "cups": "<4-6_digitos>",
         "descripcion": "<string_exacta_de_la_orden>",
         "cantidad": <int>,
-        "observaciones": "<string>"
+        "observaciones": "<string>",
+        "is_sedated": <boolean>
       }
     ],
     "observaciones_generales": "<string>"
@@ -73,9 +74,17 @@ PROCEDIMIENTOS — PROCESO DE DECISIÓN (OBLIGATORIO)
 
 DATOS ADICIONALES
 - cantidad: entero; si el documento no trae número, usa 1.
-- observaciones: agrega marcadores como “AMB”, “SUPERIORES”, etc. Aplica corrección OCR mínima (p. ej., “CIN”→“SIN”) si es claramente un error.
+- observaciones: agrega marcadores como "AMB", "SUPERIORES", etc. Aplica corrección OCR mínima (p. ej., "CIN"→"SIN") si es claramente un error.
 - diagnostico: toma el código/valor tal como aparece (p. ej., "G473").
-- entidad: usa la razón social completa si aparece (p. ej., “FOMAG FIDUPREVISORA S.A.”).
+- entidad: usa la razón social completa si aparece (p. ej., "FOMAG FIDUPREVISORA S.A.").
+
+DETECCIÓN DE SEDACIÓN (is_sedated)
+- Buscar en la orden las siguientes palabras clave (insensible a mayúsculas/acentos):
+  "sedación", "sedacion", "bajo sedación", "bajo sedacion", "bajo anestesia", "con anestesia", "anestesia general", "sedado", "sedada", "anestesiado", "anestesiada"
+- Buscar en: descripción del procedimiento, observaciones del procedimiento, observaciones generales de la orden.
+- Si encuentra alguna coincidencia relacionada con el procedimiento específico, marcar is_sedated = true para ese procedimiento.
+- Si NO encuentra ninguna referencia a sedación/anestesia, marcar is_sedated = false.
+- IMPORTANTE: La sedación aplica a procedimientos individuales, no a toda la orden.
 
 
 # ACTIVACIÓN EXPLÍCITA DE CAPITAL SALUD (ASERCIÓN)
@@ -237,6 +246,7 @@ Devuelve **SOLO** un objeto JSON válido con una única clave raíz `appointment
     {
       "appointment_slot_estimate": <int>,
       "is_contrasted_resonance": <boolean>,
+      "is_sedated": <boolean>,
       "procedures": [
         {
           "cups": "<string>",
@@ -256,6 +266,7 @@ Reglas para la SALIDA:
 - `appointments`: Un array de objetos. Si no se puede agendar ninguna cita, devuelve un array vacío: `[]`.
 - `appointment_slot_estimate`: <int>.
 - `is_contrasted_resonance`: <boolean>. Debe ser `true` si la cita es de resonancia o tomografia contrastada, de lo contrario `false`. **Esta clave debe estar siempre presente.**
+- `is_sedated`: <boolean>. Debe ser `true` si alguno de los procedimientos de la cita requiere sedación o anestesia (palabras clave: "sedación", "bajo sedación", "bajo anestesia", "con anestesia", "anestesia general"). De lo contrario `false`. **Esta clave debe estar siempre presente.**
 - `procedures`: Un array con los procedimientos de esa cita, copiando los datos de la entrada.
 PROMPT,
 
@@ -390,6 +401,15 @@ REGLAS (aplican en este orden; si una regla específica contradice una general, 
                      + (espacios de los CUPS restantes, regla 4)
    - `appointment_slot_estimate` = `total_spaces`.
    - `is_contrasted_resonance` = **true** si **al menos uno** de los CUPS/paquetes de la cita es contrastado; en caso contrario **false**.
+   - `is_sedated` = **true** si la cita incluye el código 998702 (sedación) o si las observaciones mencionan "sedación", "bajo sedación", "bajo anestesia", "con anestesia"; en caso contrario **false**.
+
+6) Bilateral (multiplicador ×2)
+   - Si las **observaciones** contienen la palabra "bilateral" (insensible a mayúsculas/acentos: "Bilateral", "BILATERAL", "bilateral"), **duplica** los espacios calculados para ese CUPS antes de aplicar sedación.
+   - Aplica solo a CUPS de extremidades, articulaciones o estructuras pareadas (ej: 883511, 883512, 883521, 883522, 883560, etc.).
+   - Ejemplo: si un CUPS de articulación simple = 1 espacio y es bilateral → 2 espacios.
+   - Ejemplo: si un CUPS de articulación contrastada = 2 espacios y es bilateral → 4 espacios.
+   - Si hay sedación (998702), el multiplicador se aplica ANTES de sumar la sedación.
+   - Anota en `notes` cuando apliques esta regla.
 
 INSTRUCCIONES DE SALIDA
 - La salida debe ser un objeto JSON con una única clave `appointments`, siguiendo la estructura definida en el prompt general. No incluyas `summary_text`.
@@ -448,6 +468,13 @@ REGLAS OPERATIVAS (claras y sin excepciones implícitas)
 6) **Casos dudosos:**
    - Si un CUPS no está en la tabla ni tiene indicaciones especiales, trátalo como **1 espacio** y acláralo en `notes`.
 
+7) **Bilateral (multiplicador ×2)**:
+   - Si las **observaciones** contienen la palabra "bilateral" (insensible a mayúsculas/acentos) y el CUPS **NO** es un estudio comparativo predefinido en la tabla (873123, 873202, 873303, 873412, 873422, 873443), **duplica** los espacios de ese CUPS.
+   - Los CUPS comparativos de la tabla **ya incluyen** el tiempo para ambos lados; **NO** apliques bilateral a estos.
+   - Ejemplo: Radiografía de rodilla (1 espacio) + bilateral en observaciones → 2 espacios.
+   - Ejemplo: 873422 (Rodillas comparativas) = 2 espacios → NO duplicar aunque diga bilateral (ya es comparativo).
+   - Anota en `notes` cuando apliques esta regla.
+
 SALIDA (formato obligatorio)
 - La salida debe ser un objeto JSON con una única clave `appointments`, siguiendo la estructura definida en el prompt general. No incluyas `summary_text`.
 
@@ -476,6 +503,13 @@ CÁLCULO POR CITA (orden estricto)
 1) Si el pedido TAC incluye **879910** → `total_spaces = 3` (override) y termina.
 2) Si **no** incluye 879910 → para cada CUPS TAC aplica Regla General o Excepciones y **suma**.
 3) Define `appointment_slot_estimate = total_spaces`.
+4) Define `is_sedated = true` si las observaciones mencionan "sedación", "bajo sedación", "bajo anestesia", "con anestesia"; de lo contrario `false`.
+5) **Bilateral (multiplicador ×2)**:
+   - Si las **observaciones** contienen la palabra "bilateral" (insensible a mayúsculas/acentos), **duplica** los espacios calculados para ese CUPS.
+   - Aplica a CUPS de extremidades, articulaciones o estructuras pareadas (ej: TAC de rodillas, hombros, muñecas, etc.).
+   - Ejemplo: TAC simple de rodilla = 1 espacio → bilateral = 2 espacios.
+   - Ejemplo: TAC contrastada de hombro = 2 espacios → bilateral = 4 espacios.
+   - Anota en `notes` cuando apliques esta regla.
 
 SALIDA (obligatoria)
 - La salida debe ser un objeto JSON con una única clave `appointments`, siguiendo la estructura definida en el prompt general. No incluyas `summary_text`.
@@ -551,7 +585,7 @@ TU TAREA
 TABLA BASE (Neurología)
 - **890374** · Consulta de control o seguimiento por especialista en neurología → **1 espacio por unidad**
 - **890274** · Consulta de primera vez por especialista en neurología → **1 espacio por unidad**
-- **53105**  · Bloqueo de unión mioneural → **1 espacio por unidad**
+- **053105**  · Bloqueo de unión mioneural → **1 espacio FIJO** (siempre 1, sin importar cantidad)
 
 REGLAS DE AGRUPACIÓN Y ESPACIOS
 1) **Consultas (890274, 890374)**
@@ -559,9 +593,10 @@ REGLAS DE AGRUPACIÓN Y ESPACIOS
    - Si en el mismo pedido aparecen **dos tipos de consulta** (primera vez y control), **no las combines**: crea **una cita por cada tipo** (cada una 1 espacio por unidad).
    - Si se repite el **mismo** CUPS de consulta sin aclaración y sin `cantidad`, cuenta **una sola unidad** (1 espacio).
 
-2) **Procedimiento (53105)**
-   - **No se agenda en la misma cita que una consulta**. Crea **cita separada** para 53105.
-   - Consume **1 espacio por unidad**.
+2) **Procedimiento (053105)**
+   - **No se agenda en la misma cita que una consulta**. Crea **cita separada** para 053105.
+   - Consume **siempre 1 espacio FIJO**, independientemente de la cantidad indicada en la orden.
+   - Ejemplo: si la orden dice "cantidad: 10" para 053105, asigna **1 espacio** (no 10).
 
 3) **Cantidad**
    - Usa `cantidad` de la orden para calcular espacios (si falta, **asume 1**).

@@ -16,6 +16,7 @@ final class CreateAppointmentCommand
         public readonly string $time,
         public readonly array $cups,
         public readonly int $espacios = 1,
-        public readonly bool $is_contrasted = false
+        public readonly bool $is_contrasted = false,
+        public readonly bool $is_sedated = false
     ) {}
 }

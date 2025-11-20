@@ -155,6 +155,7 @@ final class GenericDbAppointmentRepository extends BaseRepository implements App
         string $entity,
         int $agendaId,
         bool $is_contrasted = false,
+        bool $is_sedated = false,
         ?int $cupId = null,
     ): Appointment {
         $config = $this->getConfig(self::CENTER_KEY);
@@ -182,7 +183,7 @@ final class GenericDbAppointmentRepository extends BaseRepository implements App
             $mapping['canceled'] => 0,
             $mapping['confirmed'] => 0,
             $mapping['created_by'] => 0,
-            $mapping['observations'] => $is_contrasted ? 'Contrastada' : null
+            $mapping['observations'] => $this->buildObservations($is_contrasted, $is_sedated)
         ];
 
         if ($cupId !== null) {
@@ -192,6 +193,18 @@ final class GenericDbAppointmentRepository extends BaseRepository implements App
         $id = $connection->table($table)->insertGetId($data);
 
         return $this->findById((string)$id, self::CENTER_KEY);
+    }
+
+    private function buildObservations(bool $is_contrasted, bool $is_sedated): ?string
+    {
+        $observations = [];
+        if ($is_contrasted) {
+            $observations[] = 'Contrastada';
+        }
+        if ($is_sedated) {
+            $observations[] = 'Bajo Sedación';
+        }
+        return !empty($observations) ? implode(', ', $observations) : null;
     }
 
     public function findPendingInDateRange(string $centerKey, DateTime $startDate, DateTime $endDate): array
@@ -975,5 +988,53 @@ final class GenericDbAppointmentRepository extends BaseRepository implements App
         ]);
 
         return $updated;
+    }
+
+    /**
+     * Find the last doctor who attended a patient for specific CUPS codes (consultation)
+     */
+    public function findLastDoctorForPatientByCups(string $patientId, array $cupCodes): ?string
+    {
+        $centerKey = self::CENTER_KEY;
+        $config = $this->getConfig($centerKey);
+        $mapping = $config->mapping('appointments');
+        $appointmentTable = $config->tableName('appointments');
+        $pxcitaTable = $config->tables()['pxcita']['table'];
+        $pxcitaMapping = $config->tables()['pxcita']['mapping'];
+
+        $connection = $this->getConnection($centerKey, 'appointments');
+
+        // Buscar la última cita del paciente que tenga alguno de los CUPS especificados
+        // y que esté cumplida (fulfilled) o al menos no cancelada
+        $result = $connection->table($appointmentTable)
+            ->join(
+                $pxcitaTable,
+                "{$appointmentTable}.{$mapping['id']}",
+                '=',
+                "{$pxcitaTable}.{$pxcitaMapping['appointment_id']}"
+            )
+            ->where("{$appointmentTable}.{$mapping['patient_id']}", $patientId)
+            ->whereIn("{$pxcitaTable}.{$pxcitaMapping['cup_code']}", $cupCodes)
+            ->where("{$appointmentTable}.{$mapping['canceled']}", 0) // No cancelada
+            ->orderBy("{$appointmentTable}.{$mapping['date']}", 'desc')
+            ->orderBy("{$appointmentTable}.{$mapping['time_slot']}", 'desc')
+            ->select("{$appointmentTable}.{$mapping['doctor_id']} as doctor_document")
+            ->first();
+
+        if (!$result) {
+            Log::info('No previous consultation found for patient', [
+                'patient_id' => $patientId,
+                'cup_codes' => $cupCodes
+            ]);
+            return null;
+        }
+
+        Log::info('Found last doctor for patient consultation', [
+            'patient_id' => $patientId,
+            'doctor_document' => $result->doctor_document,
+            'cup_codes' => $cupCodes
+        ]);
+
+        return $result->doctor_document;
     }
 }
