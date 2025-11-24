@@ -41,8 +41,20 @@ class AsyncGetAvailableSlotsByCupController
         $isSedated = $validatedData['is_sedated'] ?? false;
         $patientAge = $validatedData['patient_age'];
         $patientId = (string)$validatedData['patient_id'];
+
+        // Buscar en Redis si hay paginación guardada para este paciente y CUPS
+        $afterDate = null;
+        if (!empty($patientId) && !empty($procedures)) {
+            $afterDate = GetAvailableSlotsByCupJob::getLastSlotDatetimeFromRedis($patientId, $procedures);
+        }
+
+        Log::info('----OBTENER ESPACIOS DISPONIBLES - Request received', [
+            'after_date_from_redis' => $afterDate,
+            'patient_id' => $patientId,
+            'procedures' => $procedures
+        ]);
         $resumeKey = Str::uuid()->toString();
-        $job = new GetAvailableSlotsByCupJob($procedures, $espacios, $resumeKey, $patientAge, $isContrasted, $isSedated, $patientId);
+        $job = new GetAvailableSlotsByCupJob($procedures, $espacios, $resumeKey, $patientAge, $isContrasted, $isSedated, $patientId, $afterDate);
         $job->onQueue('notifications');
 
         $this->dispatchSafely(

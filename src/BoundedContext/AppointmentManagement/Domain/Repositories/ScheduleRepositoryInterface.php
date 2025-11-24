@@ -23,4 +23,12 @@ interface ScheduleRepositoryInterface
     public function findWorkingDayException(int $agendaId, string $doctorDocument, string $date): ?array;
 
     public function updateWorkingDayExceptionDate(int $agendaId, string $doctorDocument, string $currentDate, string $newDate): bool;
+
+    /**
+     * Busca una agenda por tipo (sedacion, procedimiento, etc.) para un doctor específico
+     * @param string $doctorDocument
+     * @param string $type Tipo de agenda (sedacion, procedimiento, nocturno)
+     * @return array|null
+     */
+    public function findScheduleByDoctorAndType(string $doctorDocument, string $type): ?array;
 }

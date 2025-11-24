@@ -16,7 +16,6 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Carbon;
-use DateTime;
 use InvalidArgumentException;
 use Core\BoundedContext\AppointmentManagement\Domain\Exceptions\AppointmentSlotNotAvailableException;
 
@@ -71,6 +70,14 @@ class CreateAppointmentJob implements ShouldQueue
             $doctor = $doctorRepo->findByDocumentNumber($this->requestData['doctor_id']);
 
             $detailsText = $this->buildAppointmentDetailsText($result[0], $patient, $doctor);
+
+            // Eliminar registro de paginación de Redis al crear cita exitosamente
+            if (!empty($this->requestData['patient_id']) && !empty($this->requestData['cups'])) {
+                GetAvailableSlotsByCupJob::clearPaginationFromRedis(
+                    $this->requestData['patient_id'],
+                    $this->requestData['cups']
+                );
+            }
 
             $payload = [
                 'status' => 'ok',
@@ -130,7 +137,6 @@ class CreateAppointmentJob implements ShouldQueue
         $detail .= "*Hora:* {$time}\n";
         $detail .= "*Médico:* {$doctorName}\n";
         $detail .= "*Paciente:* {$patientName}\n";
-        $detail .= "*Estado:* Pendiente de Confirmar\n";
 
         if (!empty($appointment['cup_procedure'])) {
             if (!empty($appointment['cup_procedure'][0]['address'])) {

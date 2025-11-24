@@ -10,6 +10,8 @@ use Core\BoundedContext\AppointmentManagement\Application\DTOs\AvailableSlotDTO;
 use Core\BoundedContext\AppointmentManagement\Domain\Repositories\CupProcedureRepositoryInterface;
 use Core\BoundedContext\AppointmentManagement\Domain\Repositories\ScheduleConfigRepositoryInterface;
 use Core\BoundedContext\AppointmentManagement\Domain\Repositories\AppointmentRepositoryInterface;
+use Core\BoundedContext\AppointmentManagement\Domain\Repositories\PatientRepositoryInterface;
+use Core\BoundedContext\AppointmentManagement\Application\Services\CupsGroupFilterService;
 use Illuminate\Support\Facades\Log;
 
 class GetAvailableSlotsByCupService
@@ -19,7 +21,9 @@ class GetAvailableSlotsByCupService
         private ScheduleRepositoryInterface $scheduleRepository,
         private CupProcedureRepositoryInterface $cupProcedureRepository,
         private ScheduleConfigRepositoryInterface $scheduleConfigRepository,
-        private AppointmentRepositoryInterface $appointmentRepository
+        private AppointmentRepositoryInterface $appointmentRepository,
+        private PatientRepositoryInterface $patientRepository,
+        private CupsGroupFilterService $cupsGroupFilterService
     ) {}
 
     /**
@@ -37,9 +41,10 @@ class GetAvailableSlotsByCupService
     /**
      * @param string $cupId
      * @param int $espacios
+     * @param string|null $afterDate Fecha y hora mínima para buscar slots (Y-m-d H:i). Si se proporciona, solo retorna slots posteriores.
      * @return AvailableSlotDTO[]
      */
-    public function execute(array $procedures, int $espacios, int $patientAge, bool $isContrasted, bool $isSedated = false, string $patientId = ''): array
+    public function execute(array $procedures, int $espacios, int $patientAge, bool $isContrasted, bool $isSedated = false, string $patientId = '', ?string $afterDate = null): array
     {
         if (empty($procedures) || empty($procedures[0]['cups'])) {
             return [];
@@ -101,10 +106,60 @@ class GetAvailableSlotsByCupService
         foreach ($doctoresFiltrados as $doctor) {
             $doctorMap[$doctor['doctor_document']] = $doctor['doctor_full_name'] ?? $doctor['doctor_document'];
         }
+
+        // Verificar si el paciente es de SAN02 para aplicar validación de riesgo compartido
+        $isSan02Patient = false;
+        if (!empty($patientId)) {
+            $patient = $this->patientRepository->findById($patientId);
+            $isSan02Patient = $patient && ($patient['entity_code'] ?? '') === 'SAN02';
+        }
+
         // Unir todos los días laborales futuros de todos los doctores
 
         $daysAllDoctors = $this->scheduleRepository->findFutureWorkingDaysByDoctors($doctorDocuments);
-        Log::info('daysAllDoctors', ['daysAllDoctors' => $daysAllDoctors]);
+
+        // Si es sedación, filtrar para solo mostrar días de agendas de sedación
+        if ($isSedated) {
+            // Primero, obtener los IDs de las agendas de sedación para cada doctor
+            $sedationAgendaIds = [];
+            foreach ($doctorDocuments as $doctorDocument) {
+                $sedationSchedule = $this->scheduleRepository->findScheduleByDoctorAndType($doctorDocument, 'sedacion');
+                if ($sedationSchedule) {
+                    $sedationAgendaIds[] = $sedationSchedule['id'];
+                    Log::info('Found sedation agenda for doctor', [
+                        'doctor_document' => $doctorDocument,
+                        'sedation_agenda_id' => $sedationSchedule['id'],
+                        'sedation_agenda_name' => $sedationSchedule['name']
+                    ]);
+                }
+            }
+
+            if (empty($sedationAgendaIds)) {
+                Log::warning('No sedation agendas found for any doctor', [
+                    'doctor_documents' => $doctorDocuments
+                ]);
+                return [];
+            }
+
+            // Filtrar daysAllDoctors para solo incluir días con agenda_id de sedación
+            $daysAllDoctors = array_filter($daysAllDoctors, function ($day) use ($sedationAgendaIds) {
+                return in_array($day['agenda_id'], $sedationAgendaIds);
+            });
+            $daysAllDoctors = array_values($daysAllDoctors); // Reindexar array
+
+            Log::info('Filtered days for sedation agendas only', [
+                'sedation_agenda_ids' => $sedationAgendaIds,
+                'filtered_days_count' => count($daysAllDoctors),
+                'filtered_days' => $daysAllDoctors
+            ]);
+
+            if (empty($daysAllDoctors)) {
+                Log::warning('No working days configured for sedation agendas', [
+                    'sedation_agenda_ids' => $sedationAgendaIds
+                ]);
+                return [];
+            }
+        }
 
         if ($isContrasted) {
             Log::info('Aplicando restricciones para examen contrastado', [
@@ -121,6 +176,16 @@ class GetAvailableSlotsByCupService
         $slots = [];
         $scheduleCache = [];
         $scheduleConfigCache = [];
+        $sharedRiskLimitCache = []; // Cache para límites de riesgo compartido por mes
+
+        // Parsear afterDate para paginación
+        $afterDateTime = null;
+        $afterDateOnly = null;
+        if ($afterDate) {
+            $afterDateTime = \DateTime::createFromFormat('Y-m-d H:i', $afterDate);
+            $afterDateOnly = $afterDateTime ? $afterDateTime->format('Y-m-d') : null;
+        }
+
         $days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
         foreach ($daysAllDoctors as $day) {
             if (count($slots) >= 5) break;
@@ -130,26 +195,82 @@ class GetAvailableSlotsByCupService
 
             $weekday = (int)date('w', strtotime($day['date']));
 
+            // Si hay afterDate, saltar días anteriores a esa fecha
+            if ($afterDateOnly && $day['date'] < $afterDateOnly) {
+                continue;
+            }
+
             // Si es examen contrastado y es sábado, saltar este día
             if ($isContrasted && $weekday === 6) {
                 continue;
             }
 
-            if ($day['agenda_id'] == 0) {
-                $schedule = ['id' => 0];
-            } else {
-                // Determinar el tipo de agenda a buscar
-                $scheduleType = $cupInfo['type'];
-                if ($isSedated) {
-                    $scheduleType = 'sedacion'; // Forzar búsqueda de agendas de sedación
+            // Validación de modelo de riesgo compartido para pacientes SAN02
+            if ($isSan02Patient) {
+                $slotMonth = substr($day['date'], 0, 7); // Formato Y-m
+                $cacheKey = $cupId . '_' . $slotMonth;
+
+                if (!isset($sharedRiskLimitCache[$cacheKey])) {
+                    $sharedRiskLimitCache[$cacheKey] = $this->cupsGroupFilterService->isCupAtLimitForDate(
+                        $cupId,
+                        $day['date'],
+                        'datosipsndx'
+                    );
                 }
 
+                if ($sharedRiskLimitCache[$cacheKey]) {
+                    // Este mes ya alcanzó el límite para este grupo de CUPS, saltar
+                    continue;
+                }
+            }
+
+            // Determinar el tipo de agenda a buscar
+            $scheduleType = $cupInfo['type'];
+            if ($isSedated) {
+                $scheduleType = 'sedacion'; // Forzar búsqueda de agendas de sedación
+            }
+
+            // Variable para el ID de agenda efectivo (para el DTO)
+            $effectiveAgendaId = $day['agenda_id'];
+
+            if ($day['agenda_id'] == 0) {
+                // Si es sedación, buscar agenda de sedación del doctor
+                if ($isSedated) {
+                    $cacheKey = 'doctor_' . $doctorDocument . '_sedacion';
+                    if (isset($scheduleCache[$cacheKey])) {
+                        $schedule = $scheduleCache[$cacheKey];
+                    } else {
+                        $schedule = $this->scheduleRepository->findScheduleByDoctorAndType($doctorDocument, 'sedacion');
+                        $scheduleCache[$cacheKey] = $schedule;
+
+                        Log::info('Schedule lookup for sedation (agenda_id=0)', [
+                            'doctor_document' => $doctorDocument,
+                            'schedule_found' => $schedule ? true : false,
+                            'schedule_name' => $schedule['name'] ?? 'N/A',
+                            'schedule_id' => $schedule['id'] ?? 'N/A'
+                        ]);
+                    }
+                    if (!$schedule) continue;
+                    // Usar el ID de la agenda de sedación encontrada
+                    $effectiveAgendaId = $schedule['id'];
+                } else {
+                    $schedule = ['id' => 0];
+                }
+            } else {
                 $cacheKey = $day['agenda_id'] . '_' . ($scheduleType ?? 'default');
                 if (isset($scheduleCache[$cacheKey])) {
                     $schedule = $scheduleCache[$cacheKey];
                 } else {
                     $schedule = $this->scheduleRepository->findByScheduleId($day['agenda_id'], $scheduleType);
                     $scheduleCache[$cacheKey] = $schedule;
+
+                    Log::info('Schedule lookup', [
+                        'agenda_id' => $day['agenda_id'],
+                        'scheduleType' => $scheduleType,
+                        'isSedated' => $isSedated,
+                        'schedule_found' => $schedule ? true : false,
+                        'schedule_name' => $schedule['name'] ?? 'N/A'
+                    ]);
                 }
                 if (!$schedule) continue;
             }
@@ -162,7 +283,15 @@ class GetAvailableSlotsByCupService
             }
             if (!$scheduleConfig) continue;
 
-            $assignedAppointments = $this->appointmentRepository->findByAgendaAndDate($day['agenda_id'], $day['date']);
+            $assignedAppointments = $this->appointmentRepository->findByAgendaAndDate($effectiveAgendaId, $day['date']);
+
+            Log::info('Generating slots', [
+                'date' => $day['date'],
+                'original_agenda_id' => $day['agenda_id'],
+                'effective_agenda_id' => $effectiveAgendaId,
+                'isSedated' => $isSedated,
+                'schedule_id' => $schedule['id'] ?? 'N/A'
+            ]);
             $morningStartKey = 'morning_start_' . $days[$weekday];
             $morningEndKey = 'morning_end_' . $days[$weekday];
             $afternoonStartKey = 'afternoon_start_' . $days[$weekday];
@@ -224,6 +353,14 @@ class GetAvailableSlotsByCupService
                     }
 
                     if (!in_array($slotStartStr, $assignedTimes)) {
+                        // Si hay afterDate y es el mismo día, saltar slots con hora <= afterDateTime
+                        if ($afterDateTime && $day['date'] === $afterDateOnly) {
+                            if ($slotStart <= $afterDateTime) {
+                                $start->modify("+{$duration} minutes");
+                                continue;
+                            }
+                        }
+
                         $availableSlots[] = [
                             'start' => $slotStartStr,
                             'end' => $slotEnd->format('H:i'),
@@ -248,7 +385,7 @@ class GetAvailableSlotsByCupService
                         }
                         if ($consecutivos) {
                             $slots[] = new AvailableSlotDTO(
-                                $day['agenda_id'],
+                                $effectiveAgendaId,
                                 $doctorDocument,
                                 $doctorFullName,
                                 $day['date'],
@@ -261,7 +398,7 @@ class GetAvailableSlotsByCupService
                 } else {
                     foreach ($availableSlots as $slot) {
                         $slots[] = new AvailableSlotDTO(
-                            $day['agenda_id'],
+                            $effectiveAgendaId,
                             $doctorDocument,
                             $doctorFullName,
                             $day['date'],

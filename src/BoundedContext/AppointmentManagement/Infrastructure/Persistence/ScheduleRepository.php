@@ -128,4 +128,21 @@ class ScheduleRepository extends BaseRepository implements ScheduleRepositoryInt
 
         return $updated > 0;
     }
+
+    public function findScheduleByDoctorAndType(string $doctorDocument, string $type): ?array
+    {
+        $config = $this->getConfig();
+        $schedulesConfig = $config->tables()['schedules'];
+        $table = $schedulesConfig['table'];
+        $mapping = $schedulesConfig['mapping'];
+        $connection = $config->connection();
+
+        $row = DB::connection($connection)
+            ->table($table)
+            ->where($mapping['doctor_document'], $doctorDocument)
+            ->whereRaw($mapping['name'] . ' COLLATE utf8_general_ci LIKE ?', ['%' . $type . '%'])
+            ->first();
+
+        return $row ? ArrayMapper::mapToLogicalFields($row, $mapping) : null;
+    }
 }
