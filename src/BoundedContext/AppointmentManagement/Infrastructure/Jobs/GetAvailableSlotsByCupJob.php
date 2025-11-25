@@ -97,7 +97,7 @@ class GetAvailableSlotsByCupJob implements ShouldQueue
                 $selectionText .= "(Ejemplo: escribe 1 si deseas el primer horario)\n";
                 $selectionText .= "(Ejemplo: escribe 2 si deseas el segundo horario)";
             } else {
-                $selectionText = "Lo sentimos, no hemos encontrado horarios disponibles para los procedimientos seleccionados. Por favor, intenta de nuevo en 24 horas";
+                $selectionText = "Lo sentimos, no hemos encontrado horarios disponibles para los procedimientos seleccionados. Por favor, intenta de nuevo en 7 dias";
             }
 
             // Guardar last_slot_datetime en Redis para paginación
